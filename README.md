@@ -113,27 +113,27 @@ The table below summarizes the components included in the two versions of the Sh
 
 | Component       | ShieldUI Lite | ShieldUI Standard |
 |-----------------|:---------------:|:-------------:|
-| AutoComplete    |      Yes      |      Yes     |
-| Button          |      Yes      |      Yes     |
-| Calendar        |      Yes      |      Yes     |
-| CheckBox        |      Yes      |      Yes     |
-| ComboBox        |      Yes      |      Yes     |
-| DataSource      |      Yes      |      Yes     |
-| DatePicker      |      Yes      |      Yes     |
-| DateTimePicker  |      Yes      |      Yes     |
-| DropDown        |      Yes      |      Yes     |
-| Grid            |      Yes      |      Yes     |
-| ListBox         |      Yes      |      Yes     |
-| LoadingPanel    |      Yes      |      Yes     |
-| MaskedTextBox   |      Yes      |      Yes     |
-| MonthYearPicker |      Yes      |      Yes     |
-| NumericTextBox  |      Yes      |      Yes     |
-| Pager           |      Yes      |      Yes     |
-| QRCode          |      Yes      |      Yes     |
-| RadioButton     |      Yes      |      Yes     |
-| Switch          |      Yes      |      Yes     |
-| TextBox         |      Yes      |      Yes     |
-| TimePicker      |      Yes      |      Yes     |
+| [AutoComplete](https://demos.shieldui.com/web/autocomplete/basic-usage)    |      Yes      |      Yes     |
+| [Button](https://demos.shieldui.com/web/button/basic-usage)          |      Yes      |      Yes     |
+| [Calendar](https://demos.shieldui.com/web/calendar/basic-usage)        |      Yes      |      Yes     |
+| [CheckBox](https://demos.shieldui.com/web/checkbox/basic-usage)        |      Yes      |      Yes     |
+| [ComboBox](https://demos.shieldui.com/web/combobox/basic-usage)        |      Yes      |      Yes     |
+| [DataSource](http://www.shieldui.com/documentation/datasource)      |      Yes      |      Yes     |
+| [DatePicker](https://demos.shieldui.com/web/datepicker/basic-usage)      |      Yes      |      Yes     |
+| [DateTimePicker](https://demos.shieldui.com/web/datetimepicker/api)  |      Yes      |      Yes     |
+| [DropDown](https://demos.shieldui.com/web/dropdown/basic-usage)        |      Yes      |      Yes     |
+| [Grid](https://demos.shieldui.com/web/grid-general/basic-usage)            |      Yes      |      Yes     |
+| [ListBox](https://demos.shieldui.com/web/listbox/basic-usage)         |      Yes      |      Yes     |
+| [LoadingPanel](https://demos.shieldui.com/web/loadingpanel/template)    |      Yes      |      Yes     |
+| [MaskedTextBox](https://demos.shieldui.com/web/maskedtextbox/basic-usage)   |      Yes      |      Yes     |
+| [MonthYearPicker](https://demos.shieldui.com/web/monthyearpicker/basic-usage) |      Yes      |      Yes     |
+| [NumericTextBox](https://demos.shieldui.com/web/numerictextbox/basic-usage)  |      Yes      |      Yes     |
+| [Pager](https://demos.shieldui.com/web/pager/basic-usage)           |      Yes      |      Yes     |
+| [QRCode](https://demos.shieldui.com/web/qrcode/basic-usage)          |      Yes      |      Yes     |
+| [RadioButton](https://demos.shieldui.com/web/radiobutton/basic-usage)     |      Yes      |      Yes     |
+| [Switch](https://demos.shieldui.com/web/switch/preferences)          |      Yes      |      Yes     |
+| [TextBox](https://demos.shieldui.com/web/textbox/basic-usage)         |      Yes      |      Yes     |
+| [TimePicker](https://demos.shieldui.com/web/timepicker/basic-usage)      |      Yes      |      Yes     |
 | [Chart](https://demos.shieldui.com/web/area-chart/axis-marker)           |       No      |      Yes     |
 | [Barcode Suite](https://demos.shieldui.com/web/barcode/basic-usage)   |       No      |      Yes     |
 | [Accordion](https://demos.shieldui.com/web/accordion/basic-usage)       |       No      |      Yes     |
