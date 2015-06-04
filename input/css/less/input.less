@@ -1,0 +1,540 @@
+/* Import the theme */
+@import "../../../common/less/themes/@{theme}.less";
+
+/* Common Input Styles */
+
+/* the up and down carets are currently used in NumericTextBox */
+.sui-caret-up {
+	display: inline-block;
+    zoom: 1;
+    width: 0;
+	height: 0;
+	border-left: 0.4em solid transparent;
+	border-right: 0.4em solid transparent;
+	border-bottom: 0.4em solid;
+	vertical-align: middle;
+}
+.sui-caret-down {
+    display: inline-block;
+    zoom: 1;
+    width: 0;
+    height: 0;
+    line-height: 0;    
+    border-left: 0.4em solid transparent;
+	border-right: 0.4em solid transparent;
+	border-top: 0.4em solid;
+	vertical-align: middle;
+}
+
+.sui-input,
+.sui-numeric-textbox,
+.sui-combobox,
+.sui-dropdown,
+.sui-button,
+.sui-switch {
+    display: inline-block;
+    *display: block;
+    zoom: 1;
+    margin: 0;
+    outline: 0;
+    vertical-align: middle;
+    white-space: nowrap;
+    line-height: normal;
+    font-weight: normal;
+    box-sizing: border-box;
+    -moz-box-sizing: border-box;
+	font-size: 14px;
+	font-family: @font-family;
+	text-align: left;
+}
+/* white-space needs to be pre-wrap on textareas otherwise it will not be multi-line */
+textarea.sui-input { 
+	white-space: pre-wrap;
+}
+
+/* ListBox styles */
+.sui-listbox, 
+ul.sui-listbox {
+	position: relative;
+	display: block;
+	list-style: none;
+	color: @text-color;
+    background-color: @background-color;
+	border-width: 1px;
+	border-style: solid;
+	border-color: @border-color;
+	overflow-x: hidden;
+    overflow-y: auto;
+	margin: 0px;
+	padding: 0px;
+	outline: 0;
+	font-size: 14px;
+	font-family: @font-family;
+}
+.sui-listbox:focus {
+	border-color: @primary-border-color;
+}
+.sui-listbox-item {
+    padding: 0.5em 0.3em;
+    text-align: left;
+}
+.sui-listbox-item:hover, 
+.sui-listbox-item-active {
+    cursor: pointer;
+	color: @primary-text-color;
+	background-color: @primary-hover-color;
+	.sui-gradient-vertical(@primary-hover-color);
+}
+.sui-listbox-item-selected {
+	color: @primary-text-color;
+	background-color: @primary-background-color;
+	.sui-gradient-vertical(@primary-background-color);
+}
+.sui-listbox-disabled, 
+.sui-listbox-disabled:active, 
+.sui-listbox-disabled:focus {
+	pointer-events: none;
+	cursor: default;
+    opacity: 0.4;
+}
+
+/* NumericTextBox styles */
+.sui-numeric-textbox {
+	color: @text-color;
+	background-color: @default-background-color;
+	.sui-gradient-vertical(darken(@default-background-color, 10%));
+	border-color: @border-color;
+	border-width: 1px;
+	border-style: solid;
+	overflow: hidden;
+	padding: 0 1.8em 0 0;
+	width: 9.5em;
+    position: relative;
+}
+.sui-numeric-textbox:focus, 
+.sui-numeric-textbox-focus {
+	border-color: @primary-border-color;
+}
+.sui-numeric-textbox-nosp {
+	padding: 0;
+}
+.sui-numeric-textbox .sui-input, 
+.sui-numeric-textbox .sui-input:focus {
+	border: none;
+    padding: 0.3em 0;
+    width: 100%;
+    margin: 0;
+    border-right: 1px solid @border-color;
+    text-indent: 0.3em;
+    line-height: normal;
+    *line-height: 1em;
+	overflow: hidden;
+    vertical-align: top;
+}
+.sui-numeric-textbox-nosp .sui-input, 
+.sui-numeric-textbox-nosp .sui-input:focus {
+	border: none;
+}
+.sui-numeric-textbox .sui-spinners {
+	position: absolute;
+    right: 0;
+    top: 0;
+    width: 1.8em;
+    text-align: center;
+    vertical-align: middle;
+	overflow: hidden;
+}
+.sui-numeric-textbox .sui-spinner {
+	display: block;
+	cursor: pointer;
+	line-height: 90%;
+}
+.sui-numeric-textbox .sui-spinner:hover
+{
+    color: @primary-text-color;
+	background-color: @primary-hover-color;
+	.sui-gradient-vertical(@primary-hover-color);
+}
+.sui-numeric-textbox .sui-spinner-up {
+	margin-top: -1px;
+	padding-bottom: 1px;
+	*margin-top: -2px;
+	*padding-bottom: 0px;
+}
+.sui-numeric-textbox .sui-spinner-down {
+	*margin-top: -1px;
+	padding-bottom: 1px;
+}
+.sui-numeric-textbox-disabled {
+    background-color: transparent;
+    border-color: inherit;
+}
+.sui-numeric-textbox-disabled .sui-input,
+.sui-numeric-textbox-disabled .sui-spinner,
+.sui-numeric-textbox-disabled .sui-spinner:hover {
+	pointer-events: none;
+	cursor: default;
+    opacity: 0.4;
+}
+
+/* ComboBox and DropDown styles */
+.sui-combobox, 
+.sui-dropdown {
+	color: @text-color;
+    background-color: @default-background-color;
+	.sui-gradient-vertical(darken(@default-background-color, 10%));
+	border-width: 1px;
+	border-style: solid;
+	border-color: @border-color;
+	overflow: hidden;
+	padding: 0 1.8em 0 0;
+	width: 9.5em;
+    position: relative;
+}
+.sui-dropdown {
+	/* the only difference between combo and dropdown */
+	cursor: pointer;
+}
+.sui-combobox .sui-input, 
+.sui-combobox .sui-input:focus, 
+.sui-dropdown .sui-input, 
+.sui-dropdown .sui-input:focus {
+	border: none;
+    padding: 0.3em 0;
+    width: 100%;
+    margin: 0;
+    border-right: 1px solid;
+	border-color: @border-color;
+    text-indent: 0.3em;
+    line-height: normal;
+    *line-height: 1em;
+	overflow: hidden;
+    vertical-align: top;
+}
+.sui-combobox .sui-caret-container, 
+.sui-dropdown .sui-caret-container {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 1.7em;
+    padding: 0.3em 0;
+    cursor: pointer;
+    text-align: center;
+    vertical-align: middle;
+}
+.sui-combobox .sui-caret, 
+.sui-dropdown .sui-caret {
+    display: inline-block;
+    *margin-top: 0.4em;
+    zoom: 1;
+    width: 0;
+    height: 0;
+    line-height: 0;    
+    border-width: 0.4em 0.4em 0.2em;
+    border-style: solid;
+    border-color: transparent transparent transparent transparent;
+	border-top-color: @text-color;
+    vertical-align: middle;
+}
+.sui-combobox:focus, 
+.sui-combobox-focus,
+.sui-dropdown:focus, 
+.sui-dropdown-focus {
+	border-color: @primary-border-color;
+}
+.sui-combobox:hover,
+.sui-dropdown:hover {
+	color: @primary-text-color;
+    background-color: @primary-hover-color;
+	.sui-gradient-vertical(@primary-hover-color);
+}
+.sui-combobox:hover .sui-caret,
+.sui-dropdown:hover .sui-caret {
+    border-top-color: @primary-text-color;
+}
+.sui-combobox-disabled, 
+.sui-combobox-disabled .sui-input,
+.sui-dropdown-disabled, 
+.sui-dropdown-disabled .sui-input {
+	pointer-events: none;
+	cursor: default;
+    opacity: 0.4;
+}
+
+/* Autocomplete styles */
+.sui-autocomplete, 
+ul.sui-autocomplete {
+    position: absolute;
+    display: none;
+	list-style: none;
+    margin: 0px;
+    padding: 0px;
+	max-height: 300px;
+	font-size: 14px;
+	font-family: @font-family;
+	z-index: 1800;
+}
+.sui-autocomplete-loading {
+    background-repeat: no-repeat;
+    background-position: right;
+	background-image: url("../img/loading-@{theme-name}-small.gif");
+}
+
+/* Input styles */
+.sui-input {
+	color: @text-color;
+	background-color: @background-color;
+    border-color: @border-color;
+	border-style: solid;
+	border-width: 1px;
+    width: 150px;
+    padding: 0.3em;
+}
+.sui-input:focus {
+	border-color: @primary-border-color;
+}
+.sui-input-disabled {
+	pointer-events: none;
+	cursor: default;
+    opacity: 0.4;
+}
+.sui-input::-ms-clear {
+    display: none;
+}
+
+/* Button styles */
+.sui-button {
+	color: @default-text-color;
+	background-color: @default-background-color;
+	.sui-gradient-vertical(darken(@default-background-color, 10%));
+	border-color: @default-border-color;
+	border-width: 1px;
+	border-style: solid;
+	padding: 0.3em;
+	cursor: pointer;
+	overflow: hidden;
+	text-align: center;
+	.sui-unselectable();
+}
+.sui-button:focus {
+}
+.sui-button:hover {
+	color: @primary-text-color;
+	background-color: @primary-hover-color;
+	.sui-gradient-vertical(@primary-hover-color);
+}
+.sui-button:active {
+	color: @primary-text-color;
+	background-color: @primary-background-color;
+	.sui-gradient-vertical(@primary-background-color);
+}
+.sui-button-checked {
+	color: @primary-text-color;
+	background-color: @primary-background-color;
+	.sui-gradient-vertical(@primary-background-color);
+}
+.sui-button-disabled, 
+.sui-button-disabled:focus, 
+.sui-button-disabled:active, 
+.sui-button-disabled:hover {
+	pointer-events: none;
+	cursor: default;
+    opacity: 0.4;
+}
+
+/* Checkbox styles */
+.sui-checkbox {
+    display: inline-block;
+    cursor: pointer;
+    .sui-unselectable();
+	font-size: 14px;
+	font-family: @font-family;
+}
+.sui-checkbox-input {
+    display: none;
+}
+.sui-checkbox-element {
+    display: inline-block;
+    width: 0.8em;
+    height: 0.8em;
+	background-color: @background-color;
+    border-width: 1px;
+    border-style: solid;
+	border-color: @border-color;
+    vertical-align: bottom;    
+    padding: 2px;
+}
+.sui-checkbox-element:hover {
+    border-color: @primary-border-color;
+}
+.sui-checkbox-unchecked .sui-checkmark,
+.sui-checkbox-indeterminate .sui-checkmark {
+    display: block;
+    font-weight: bold;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+.sui-checkbox-indeterminate .sui-checkmark {
+    background-color: @primary-background-color;
+}
+.sui-checkbox-checked .sui-checkmark {
+    display: block;                
+    width: 0.65em;
+    height: 0.25em;
+	border-style: solid;
+    border-width: 0 0 0.2em 0.2em;
+	border-color: @primary-background-color;
+	border-top-color: transparent;
+    margin-top: 0.1em;
+	/* margin-top: -0.1em\9; */
+	background-color: %("-0.1em\9"); /* IE 7 & 8*/
+    -moz-transform: rotate(-45deg);
+    -webkit-transform: rotate(-45deg);
+    -o-transform: rotate(-45deg);
+    transform: rotate(-45deg);
+}
+.sui-checkbox-label {
+    padding-left: 0.250em;
+    position: relative;
+    line-height: 0.8em;
+	color: @text-color;
+}
+.sui-checkbox-label-hover {
+    cursor: pointer;
+}
+.sui-checkbox-disabled .sui-checkbox-label-hover, 
+.sui-checkbox-disabled.sui-checkbox {
+    cursor: default;
+    opacity: 0.4;
+}
+.sui-checkbox-disabled .sui-checkbox-element:hover {
+    border-color: @border-color;
+}
+
+ /* Radiobutton styles */
+.sui-radiobutton {
+    display: inline-block;
+    cursor: pointer;
+    .sui-unselectable();
+	font-size: 14px;
+	font-family: @font-family;
+}
+.sui-radiobutton-input {
+    display: none;
+}
+.sui-radiobutton-element {
+    display: inline-block;
+    zoom: 1;
+    width: 0.75em;
+    height: 0.75em;
+    line-height: 0.8em;
+    font-size: 1em;
+    vertical-align: bottom;
+	background-color: @background-color;
+    border-color: @border-color;
+    border-style: solid;
+	border-width: 1px;
+    padding: 2px;
+    -moz-border-radius: 50%;
+    -webkit-border-radius: 50%;
+    -o-border-radius: 50%;
+    border-radius: 50%;
+}
+.sui-radiobutton-element:hover {
+    border-color: @primary-border-color;
+}
+.sui-radiobutton .sui-checkmark {
+    display: block;
+    width: 100%;
+    height: 100%;    
+    -moz-border-radius: 50%;
+    -webkit-border-radius: 50%;
+    -o-border-radius: 50%;
+    border-radius: 50%;
+}
+.sui-radiobutton-checked .sui-checkmark {
+    background-color: @primary-background-color;
+}
+.sui-radiobutton-label {
+    padding-left: 0.250em;
+    position: relative;
+    top: -0.063em;
+	color: @text-color;
+}
+.sui-radiobutton-label-hover {
+    cursor: pointer;
+}
+.sui-radiobutton-disabled .sui-radiobutton-label-hover, 
+.sui-radiobutton-disabled.sui-radiobutton {
+    cursor: default;
+    opacity: 0.4;
+}
+
+/* Swith styles */
+.sui-switch {
+	position: relative;
+	width: 3.5em;
+	height: 1.8em;
+	cursor: pointer;
+	overflow: hidden;
+	background-color: @border-color;
+}
+.sui-switch-checked {
+}
+.sui-switch-disabled {
+	cursor: default;
+    opacity: 0.4;
+}
+.sui-switch-inner {
+	position: absolute;
+	width: auto;
+	height: auto;
+	top: 2px;
+	left: 2px;
+	right: 2px;
+	bottom: 2px;
+	padding-left: 1.2em;
+	padding-right: 0.1em;
+	padding-top: 2px;
+	text-align: center;
+	vertical-align: middle;
+	color: @text-color;
+	background-color: @background-color;
+}
+.sui-switch-text {
+	vertical-align: middle;
+	font-size: 12px;
+}
+.sui-switch-checked .sui-switch-inner {
+	padding-left: 0.1em;
+	padding-right: 1.2em;
+	color: @primary-text-color;
+	background-color: @primary-background-color;
+}
+.sui-switch-handle {
+	width: 1.2em;
+	position: absolute;
+	top: 0;
+	left: -2px;
+	background-color: @overlay-background-color;
+	.sui-gradient-vertical(darken(@overlay-background-color, 10%));
+	border-right: 2px solid @background-color;
+	border-left: 2px solid @background-color;
+}
+.sui-switch-checked .sui-switch-handle {
+	border-right: none;
+}
+.sui-switch:focus .sui-switch-handle, 
+.sui-switch:hover .sui-switch-handle, 
+.sui-switch-handle:hover {
+	background-color: @primary-hover-color;
+	.sui-gradient-vertical(darken(@primary-hover-color, 10%));
+}
+.sui-switch-disabled:focus .sui-switch-handle,
+.sui-switch-disabled:hover .sui-switch-handle,
+.sui-switch-disabled .sui-switch-handle {
+	background-color: @default-border-color;
+	.sui-gradient-vertical(darken(@default-border-color, 10%));
+}

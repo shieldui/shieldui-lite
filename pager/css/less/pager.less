@@ -1,0 +1,104 @@
+/* Import the theme */
+@import "../../../common/less/themes/@{theme}.less";
+
+/* Pager styles */
+.sui-pager-core {
+    padding-bottom: 0.250em;
+    padding-top: 0.563em;
+    white-space: normal;
+    width: 100%;
+	font-size: 14px;
+	font-family: @font-family;
+}
+.sui-pager-element, .sui-pagination-ie {
+    float: left;
+}
+.sui-pager-core div, .sui-pager-core a {
+    .sui-unselectable();
+}
+.sui-pagination a {
+    cursor: pointer;
+}
+.sui-pagination a:hover {
+	background-color: transparent;
+}
+.sui-pagination .sui-disabled a {
+    cursor: default;
+}
+.sui-pagination .sui-pager-element.sui-disabled:hover
+{
+    background-color: transparent;
+}
+.sui-pagination:first-child {
+    border-radius: 4px 4px 4px 4px;
+}
+.sui-pager-core .sui-pagination {
+    display: inline-block;
+    margin: 0 0 0 0.375em;
+    overflow: hidden;
+    cursor: default;
+    list-style-type: none;
+    padding: 0;
+}
+.sui-pager-core .sui-pagination-ie7 {
+    float: left;
+}
+.sui-pager-core .sui-pagination a {
+    border-image: none;
+    border-style: solid;
+    border-width: 0px 1px 0px 0;
+    float: left;
+    padding: 0.29em 0.750em;
+    text-decoration: none;
+}
+.sui-pager-core div.sui-pager-info-box, .sui-pager-core div.sui-pager-info-box-ie {
+    display: inline-block;
+    float: right;
+    padding-right: 0.375em;
+    padding-top: 0.250em;
+}
+.sui-pager-core .sui-disabled {
+    opacity: 0.4;
+    filter: alpha(opacity=40);
+    cursor: default;
+}
+
+.sui-pager {
+    background-color: @default-background-color;
+    border-color: @default-border-color;
+}
+.sui-pager .sui-pagination {
+	background-color: @default-background-color;
+	border-width: 1px;
+	border-style: solid;
+	border-color: @default-border-color;
+}
+.sui-pager .sui-pagination a {
+	color: @default-text-color;
+    border-color: @default-border-color;
+}
+.sui-pager .sui-pagination a:hover {
+    color: @primary-text-color;
+}
+.sui-pager .sui-pagination .sui-selected {
+	color: @primary-text-color;
+    background-color: @primary-background-color;
+	.sui-gradient-vertical(@primary-background-color);
+}
+.sui-pager .sui-pagination .sui-last {
+    border-right-width: 0;
+}
+.sui-pager .sui-pagination .sui-disabled a:hover {
+     color: @default-text-color;
+}
+.sui-pager .sui-pagination .sui-pager-element:hover {
+    background-color: @primary-hover-color;
+	.sui-gradient-vertical(@primary-hover-color);
+}
+.sui-pager .sui-pager-info-box {
+    color: @default-text-color;
+}
+.sui-pager .sui-pagination .sui-pager-element.sui-disabled:hover {
+    filter: alpha(opacity=40);
+    opacity: 0.4;
+}

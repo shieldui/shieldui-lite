@@ -1,0 +1,26 @@
+{
+  "name": "shieldui-lite",
+  "title": "ShieldUI Lite",
+  "description": "A lightweight version of the ShieldUI JavaScript library",
+  "homepage": "https://www.shieldui.com",
+  "licenses": {
+    "type": "MIT",
+    "url": "https://github.com/shieldui/shieldui-lite/blob/master/LICENSE.txt"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "grunt": "~0.4.1",
+    "grunt-banner": "~0.1.4",
+    "grunt-bower-task": "^0.4.0",
+    "grunt-text-replace": "~0.3.11",
+    "grunt-contrib-clean": "~0.4.1",
+    "grunt-contrib-copy": "~0.4.1",
+    "grunt-contrib-less": "^0.11.3",
+    "grunt-contrib-jshint": "^0.11.2",
+    "grunt-contrib-qunit": "^0.7.0",
+    "grunt-contrib-uglify": "~0.2.0",
+    "grunt-contrib-cssmin": "~0.6.0",
+    "grunt-contrib-concat": "~0.2.0"
+  },
+  "keywords": []
+}

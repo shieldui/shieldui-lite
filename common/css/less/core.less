@@ -1,0 +1,67 @@
+/* Import the theme */
+@import "../../../common/less/themes/@{theme}.less";
+
+/* ShieldUI Util styles */
+
+/* Common styles */
+.sui-unselectable
+{
+	.sui-unselectable();
+}
+.sui-sprite {
+	background-image: url(../img/shieldui-sprite.png);
+	background-repeat: no-repeat;
+	width: 16px;
+	height: 16px;
+}
+
+/* Resizable styles */
+.sui-resizable {
+	position: relative;
+}
+.sui-resizable-handle {
+	position: absolute;
+}
+.sui-resizable-dir-e {
+	cursor: ew-resize;
+}
+.sui-resizable-dir-w {
+	cursor: ew-resize;
+}
+.sui-resizable-dir-n {
+	cursor: ns-resize;
+}
+.sui-resizable-dir-s {
+	cursor: ns-resize;
+}
+.sui-resizable-dir-se {
+	cursor: nwse-resize;
+}
+.sui-resizable-dir-sw {
+	cursor: nesw-resize;
+}
+.sui-resizable-dir-ne {
+	cursor: nesw-resize;
+}
+.sui-resizable-dir-nw {
+	cursor: nwse-resize;
+}
+.sui-resizable-disabled .sui-resizable-dir-e, .sui-resizable-disabled .sui-resizable-dir-w, 
+.sui-resizable-disabled .sui-resizable-dir-n, .sui-resizable-disabled .sui-resizable-dir-s,
+.sui-resizable-disabled .sui-resizable-dir-se, .sui-resizable-disabled .sui-resizable-dir-sw, 
+.sui-resizable-disabled .sui-resizable-dir-ne, .sui-resizable-disabled .sui-resizable-dir-nw 
+{
+	cursor: default;
+}
+
+
+/* Draggable styles */
+.sui-draggable {
+}
+.sui-draggable-dragging {
+	cursor: move;
+}
+.sui-draggable-disabled, .sui-draggable-dragging.sui-draggable-disabled {
+	cursor: default;
+}
+

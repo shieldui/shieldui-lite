@@ -1,0 +1,38 @@
+/* LESS definitions for the ShieldUI 'light' theme */
+
+/* import the common definitions */
+@import "../common.less";
+
+
+/* the theme name */
+@theme-name: @theme;
+
+
+/* normal colors */
+@text-color: #6D6D6D;
+@background-color: #FFFFFF;
+@border-color: #C4C4C4;
+
+/* default colors */
+@default-text-color: @text-color;
+@default-background-color: #ECEDEE;
+@default-border-color: @border-color;
+@default-hover-color: darken(@default-background-color, 10%);
+
+/* primary colors */
+@primary-text-color: #FFFFFF;
+@primary-background-color: #197BB5;
+@primary-border-color: lighten(@primary-background-color, 10%);
+@primary-hover-color: lighten(@primary-background-color, 10%);
+
+/* a text color for both default and primary backgrounds */
+@primary-and-default-text-color: #B2B4B6;
+
+/* overlay colors */
+@overlay-background-color: #919191;
+
+/* sprite position*/
+@sprite-position: 1;
+
+/* widget-specific stuff */
+@rating-stars-sprite-pos: 1;
