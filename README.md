@@ -97,7 +97,7 @@ The dependencies such as jQuery and Gloablize should be in `external`.
 
 The widgets present in the ShieldUI Lite Suite are fully documented. 
 
-To see more information on how to get started using them, please refer to the following documentation [page](http://www.shieldui.com/documentation). 
+To see more information on how to get started using them, please refer to the following [documentation page](http://www.shieldui.com/documentation). 
 
 To see the specific information for a particular widget, simply navigate to the widget that you interested in. There is a separate documentation section for each widget. 
 
@@ -143,6 +143,8 @@ The table below summarizes the components included in the two versions of the Sh
 | [Slider](https://demos.shieldui.com/web/slider/basic-usage)          |       No      |      Yes     |
 | [Splitter](https://demos.shieldui.com/web/splitter/basic-usage)        |       No      |      Yes     |
 | [Tooltip](https://demos.shieldui.com/web/tooltip/basic-usage)         |       No      |      Yes     |
+| [TreeMap](https://demos.shieldui.com/web/treemap/basic-usage)         |       No      |      Yes     |
+| [TreeView](https://demos.shieldui.com/web/treeview/basic-usage)         |       No      |      Yes     |
 | [Window](https://demos.shieldui.com/web/window/basic-functionality)          |       No      |      Yes     |
 
 ## License Information
