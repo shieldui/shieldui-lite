@@ -135,6 +135,7 @@ The table below summarizes the components included in the two versions of the Sh
 | [TextBox](https://demos.shieldui.com/web/textbox/basic-usage)         |      Yes      |      Yes     |
 | [TimePicker](https://demos.shieldui.com/web/timepicker/basic-usage)      |      Yes      |      Yes     |
 | [Chart](https://demos.shieldui.com/web/area-chart/axis-marker)           |       No      |      Yes     |
+| [Editor](https://demos.shieldui.com/web/editor/basic-usage)           |       No      |      Yes     |
 | [Barcode Suite](https://demos.shieldui.com/web/barcode/basic-usage)   |       No      |      Yes     |
 | [Accordion](https://demos.shieldui.com/web/accordion/basic-usage)       |       No      |      Yes     |
 | [ColorPicker](https://demos.shieldui.com/web/colorpicker/basic-usage)     |       No      |      Yes     |
@@ -145,6 +146,7 @@ The table below summarizes the components included in the two versions of the Sh
 | [Tooltip](https://demos.shieldui.com/web/tooltip/basic-usage)         |       No      |      Yes     |
 | [TreeMap](https://demos.shieldui.com/web/treemap/basic-usage)         |       No      |      Yes     |
 | [TreeView](https://demos.shieldui.com/web/treeview/basic-usage)         |       No      |      Yes     |
+| [Upload](https://demos.shieldui.com/web/upload/basic-usage)         |       No      |      Yes     |
 | [Window](https://demos.shieldui.com/web/window/basic-functionality)          |       No      |      Yes     |
 
 ## License Information
