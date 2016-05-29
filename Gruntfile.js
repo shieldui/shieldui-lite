@@ -81,7 +81,7 @@ grunt.initConfig({
 				sort: true,
 				toplevel: true
 			},
-			compress: true,
+			compress: {},
 			preserveComments: false
 		},
         core: {
