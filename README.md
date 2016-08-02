@@ -143,6 +143,7 @@ The table below summarizes the components included in the two versions of the Sh
 | [Rating](https://demos.shieldui.com/web/rating/evaluation)          |       No      |      Yes     |
 | [Slider](https://demos.shieldui.com/web/slider/basic-usage)          |       No      |      Yes     |
 | [Splitter](https://demos.shieldui.com/web/splitter/basic-usage)        |       No      |      Yes     |
+| [Timeline](https://demos.shieldui.com/web/timeline/basic-usage)         |       No      |      Yes     |
 | [Tooltip](https://demos.shieldui.com/web/tooltip/basic-usage)         |       No      |      Yes     |
 | [TreeMap](https://demos.shieldui.com/web/treemap/basic-usage)         |       No      |      Yes     |
 | [TreeView](https://demos.shieldui.com/web/treeview/basic-usage)         |       No      |      Yes     |
