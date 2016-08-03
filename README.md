@@ -33,6 +33,11 @@ The widgets included in the present Suite are listed below.
 * [TextBox](https://demos.shieldui.com/web/textbox/basic-usage)
 * [TimePicker](https://demos.shieldui.com/web/timepicker/basic-usage)
 
+
+You can install Shield UI Lite using [Bower](https://bower.io):
+
+> bower install shieldui-lite
+
 ## Requirements and Dependencies
 
 Shield UI Lite depends on the following external JavaScript libraries:
