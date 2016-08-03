@@ -14,7 +14,6 @@
     "type": "git",
     "url": "git://github.com/shieldui/shieldui-lite.git"
   },
-  "private": true,
   "moduleType": [
     "globals"
   ],
