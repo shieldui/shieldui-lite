@@ -44,6 +44,6 @@ Temporary Items
 
 # Other files
 .svn
-dist
 node_modules
 bower_components
+external

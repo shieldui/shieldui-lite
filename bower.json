@@ -4,13 +4,11 @@
   "authors": [
     "customerservice@shieldui.com"
   ],
-  "description": "A lightweight version of the ShieldUI JavaScript library",
   "keywords": [
     "shieldui",
     "shieldui-lite"
   ],
   "license": "MIT",
-  "homepage": "https://www.shieldui.com",
   "private": true,
   "ignore": [
     "**/.*",
