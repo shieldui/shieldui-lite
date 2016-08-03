@@ -25,7 +25,7 @@
   "ignore": [
     "*",
     "!dist/",
-    "!dist/*"
+    "!dist/**"
   ],
   "dependencies": {
     "jquery": "^1.9.1",
