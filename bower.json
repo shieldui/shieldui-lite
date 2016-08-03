@@ -1,19 +1,31 @@
 {
   "name": "shieldui-lite",
   "version": "1.7.9",
+  "description": "A lightweight version of the ShieldUI JavaScript library",
   "authors": [
     "customerservice@shieldui.com"
   ],
+  "homepage": "https://www.shieldui.com",
   "keywords": [
     "shieldui",
     "shieldui-lite"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/shieldui/shieldui-lite.git"
+  },
   "private": true,
+  "main": [
+    "dist/js/shieldui-lite-all.min.js"
+  ],
+  "moduleType": [
+    "globals"
+  ],
   "ignore": [
-    "**/.*",
-    "node_modules",
-    "bower_components"
+    "*",
+    "!dist/",
+    "!dist/*"
   ],
   "dependencies": {
     "jquery": "^1.9.1",
