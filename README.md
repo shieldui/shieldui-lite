@@ -37,7 +37,9 @@ The widgets included in the present Suite are listed below.
 
 You can install Shield UI Lite using [Bower](https://bower.io):
 
-> bower install shieldui-lite
+```bash
+bower install shieldui-lite
+```
 
 This will create the following directory, containing all Shield UI Lite assets:
 
