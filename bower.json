@@ -16,16 +16,14 @@
     "url": "git://github.com/shieldui/shieldui-lite.git"
   },
   "private": true,
-  "main": [
-    "dist/js/shieldui-lite-all.min.js"
-  ],
   "moduleType": [
     "globals"
   ],
   "ignore": [
     "*",
     "!dist/",
-    "!dist/**"
+    "!dist/**",
+    "!LICENSE.txt"
   ],
   "dependencies": {
     "jquery": "^1.9.1",
