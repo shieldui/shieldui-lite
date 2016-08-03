@@ -39,6 +39,10 @@ You can install Shield UI Lite using [Bower](https://bower.io):
 
 > bower install shieldui-lite
 
+This will create the following directory, containing all Shield UI Lite assets:
+
+```bower_components/shieldui-lite/dist```
+
 ## Requirements and Dependencies
 
 Shield UI Lite depends on the following external JavaScript libraries:
