@@ -33,6 +33,7 @@ The widgets included in the present Suite are listed below.
 * [TextBox](https://demos.shieldui.com/web/textbox/basic-usage)
 * [TimePicker](https://demos.shieldui.com/web/timepicker/basic-usage)
 
+### Bower Installation
 
 You can install Shield UI Lite using [Bower](https://bower.io):
 

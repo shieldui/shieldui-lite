@@ -21,7 +21,7 @@
     "*",
     "!dist/",
     "!dist/**",
-    "!LICENSE.txt"
+    "!LICENSE.txt",
   ],
   "dependencies": {
     "jquery": "^1.9.1",
