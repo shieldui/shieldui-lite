@@ -1,0 +1,33 @@
+/* Shield UI Lite 1.7.31 | Copyright 2013-2017 Shield UI Ltd. | https://www.shieldui.com */
+
+/*Shield UI Lite
+
+Copyright (c) 2013-2017 ShieldUI Ltd., https://www.shieldui.com
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+====
+
+All files located in the node_modules, bower_components and external 
+directories are externally maintained libraries used by this software which 
+have their own licenses; we recommend you read them, as their terms may 
+differ from the terms above.
+*/
+
+.sui-window{display:block;color:#c3c3c3;background-color:#111;box-shadow:0 0 7px #5d5e63;border-style:solid;border-width:1px;border-color:#5d5e63;z-index:1100;line-height:normal;font-size:14px;font-family:Helvetica,Arial,sans-serif}.sui-window-titlebar{position:relative;clear:both;width:100%;height:35px;overflow:hidden;color:#fff;border-color:#2199e0;background-color:#197bb5}.sui-window-title{float:left;display:inline-block;padding:.7em}.sui-window-icons{float:right;display:inline-block;margin-top:6px;margin-right:2px}.sui-window-button,.sui-button.sui-window-button{width:22px;height:22px;cursor:pointer;margin-right:3px;padding:0;text-align:center;border:0;background-color:transparent;background-image:none}.sui-window-button:hover{background-color:#2199e0}.sui-window-button-icon{margin:auto;margin-top:2px}.sui-window-button-icon-close{background-position:-48px 0}.sui-window-button-icon-maximize{background-position:-64px 0}.sui-window-button-icon-restore{background-position:-80px 0}.sui-window-button-icon-minimize{background-position:-96px 0}.sui-window-button-icon-unminimize{background-position:-80px 0}.sui-window-button-icon-pin{background-position:-112px 0}.sui-window-button-icon-unpin{background-position:-128px 0}.sui-window-content{position:relative;clear:both;display:inline-block;overflow:auto;padding:7px;background-color:#111}.sui-window-modal{position:absolute;top:0;left:0;width:100%;height:100%;z-index:1000;background-color:#919191;opacity:.35;filter:alpha(opacity=35)}

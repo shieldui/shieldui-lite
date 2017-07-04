@@ -1,5 +1,5 @@
 (function ($, shield, win, UNDEFINED) {
-    "use strict";
+    //"use strict";
 
     // some variables global for the closure
     var Widget = shield.ui.Widget,
@@ -7,7 +7,11 @@
         DataSource = shield.DataSource,
         shieldFormat = shield.format,
         support = shield.support,
+        shieldExport = shield.exp,
         get = shield.get,
+        iid = shield.iid,
+        strid = shield.strid,
+        keyCode = shield.Constants.KeyCode,
 
         is = shield.is,
         isFunc = is.func,
@@ -17,6 +21,9 @@
         isDefined = is.defined,
         isNumber = is.number,
         isUndefined = is["undefined"],
+        isNull = is["null"],
+
+        toInt = shield.to["int"],
 
 		doc = document,
         abs = Math.abs,
@@ -27,6 +34,7 @@
         proxy = $.proxy,
         extend = $.extend,
 		map = $.map,
+        grep = $.grep,
         inArray = $.inArray,
 
 		userAgent = navigator.userAgent,
@@ -39,17 +47,31 @@
 		isWebKit = /AppleWebKit/.test(userAgent),
 		isFirefox = /Firefox/.test(userAgent),
 
+        ROLE = "role",
+        ID = "id",
+        ARIA_SORT = "aria-sort",
+        ARIA_READONLY = "aria-readonly",
+        ASCENDING = "ascending",
+        DESCENDING = "descending",
+        TABINDEX = "tabindex",
+        TRUE = "true",
+        FALSE = "false",
         HEIGHT = "height",
         WIDTH = "width",
         SELECTABLE = "sui-selectable",
         SELECTED = "sui-selected",
-
         CHANGE = "change",
+        FOCUS = "focus",
+        BLUR = "blur",
         START = "start",
         SCROLL = "scroll",
         COMMAND = "command",
+        SELECTIONCHANGING = "selectionChanging",
         SELECTIONCHANGED = "selectionChanged",
+        SELECTSTART = "selectstart",
         DATABOUND = "dataBound",
+        VIRTUAL_ROWS_LOADED = "virtualRowsLoaded",
+        KEYDOWN = "keydown",
         MOUSEDOWN = "mousedown",
         MOUSEMOVE = "mousemove",
         MOUSEUP = "mouseup",
@@ -59,6 +81,7 @@
         SORT = "sort",
         DETAILCREATED = "detailCreated",
         COLUMNREORDER = "columnReorder",
+        COLUMN_RESIZE = "columnResize",
         GROUPSREORDER = "groupsReorder",
         GROUP = "group",
         UNGROUP = "ungroup",
@@ -75,6 +98,15 @@
         ERROR = "error",
         COLLAPSE = "collapse",
         EXPAND = "expand",
+        EDITWINDOWOPEN = "editWindowOpen",
+        INSERTWINDOWOPEN = "insertWindowOpen",
+        DISPLAY = "display",
+        NONE = "none",
+        DISABLED = "disabled",
+        CUSTOM_FILTER = "@@custom",
+
+        SUI_VIEWINDEX = "sui-viewindex",
+        SUI_FIELDNAME = "sui-fieldname",
 
         defaults;
 
@@ -98,24 +130,66 @@
         return result;
     }
 
-    function getElementsFromEvent(e, element) {
-        var cell = $(e.target).closest(".sui-cell", element);
+    function hasAttribute(element, attribute) {
+        var attr = $(element).attr(attribute);
+        return isDefined(attr) && attr !== false;
+    }
+
+    function getElementsFromEvent() {
+        var args = [].slice.call(arguments),
+            event = args.shift(),
+            cell,
+            row,
+            currentCell,
+            i;
+
+        // try to take the cell from each element passed, stop when found
+        for (i=0; i<args.length; i++) {
+            cell = $(event.target).closest(".sui-cell", args[i]);
+            if (cell.length) {
+                break;
+            }
+        }
 
         if (!cell.length) {
             return null;
         }
 
-        var row = cell[0].parentNode,
-            currentCell = cell[0];
+        row = cell[0].parentNode;
+        currentCell = cell[0];
 
         if (row == null || currentCell == null) {
             return null;
         }
         else {
             return {
-                "row": row,
-                "cell": currentCell
+                row: row,
+                cell: currentCell
             };
+        }
+    }
+
+    function elementsSelected(elements) {
+        return elements && ($(elements.row).hasClass(SELECTED) || $(elements.cell).hasClass(SELECTED));
+    }
+
+    function isEventTargetInsideCell(e, element) {
+        return $(e.target).closest(".sui-cell", element).length > 0;
+    }
+
+    function focusFirst(element) {
+        var first = $(element)
+            .find(
+                '.sui-checkbox:not(.sui-checkbox-disabled), .sui-radiobutton:not(.sui-radiobutton-disabled), .sui-input:not(.sui-input-disabled), ' + 
+                '.sui-combobox:not(.sui-combobox-disabled), .sui-dropdown:not(.sui-dropdown-disabled), ' + 
+                '.sui-listbox:not(.sui-listbox-disabled), .sui-switch:not(.sui-switch-disabled), ' +
+                'a[href], area[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), iframe, object, embed, *[tabindex]:not([tabindex="-1"]), *[contenteditable]'
+            )
+            .filter(':visible')
+            .first();
+
+        if ($(first).length > 0) {
+            $(first).focus();
         }
     }
 
@@ -152,7 +226,7 @@
             for (i = 0; i < options.length; i++) {
                 toolbar = options[i];
                 position = toolbar.position ? toolbar.position : "top";
-                currentToolbarWrapper = $("<div class='sui-toolbar'></div>");
+                currentToolbarWrapper = $('<div class="sui-toolbar"/>');
 
                 if (position === "top") {
                     toolbars = grid.element.find(".sui-toolbar");
@@ -190,8 +264,8 @@
             }
         },
 
-        // build single shildui button and appned it to the toolbar
-        _buildButton: function (buttonOptions, toolbar) {
+        // build single shildui button and appned it to the given container
+        _buildButton: function (buttonOptions, container) {
             var self = this,
                 commandName = buttonOptions.commandName,
                 commandHandler = buttonOptions.click,
@@ -199,19 +273,20 @@
                 btn;
 
             if (shield.ui.Button) {
-                wrapperButton = $("<button type='button'>" + buttonOptions.caption + "</button>")
-                    .appendTo(toolbar);
+                wrapperButton = $('<button type="button">' + buttonOptions.caption + '</button>')
+                    .appendTo(container);
 
                 // override the command handler if a commandName is set
-                if (commandName === "insert") {
+                if (commandName == "insert") {
                     commandHandler = self._insertButtonClicked;
                 }
-                else if (commandName === "save") {
+                else if (commandName == "save") {
                     commandHandler = self._saveButtonClicked;
                 }
-                else if (commandName === "cancel") {
+                else if (commandName == "cancel") {
                     commandHandler = self._cancelButtonClicked;
                 }
+                
 
                 // build the button with the given options
                 btn = new shield.ui.Button(wrapperButton, {
@@ -223,39 +298,67 @@
             }
         },
 
+        
+
         // handle the click event of insert button
-        _insertButtonClicked: function (e) {
+        _insertButtonClicked: function (e, skipCommand) {
             var self = this,
                 options = self.options,
                 newRowPosition = options.editing.insertNewRowAt,
                 dataSource = self.dataSource,
+                virtual = self._hasVirtualScrolling(),
+                insertLast = false,
                 model,
                 row,
                 index,
-                //pager = self.pager,
-                //editIndex = pager ? pager.pageSize() * (pager.currentPage - 1) : 0,
                 args,
                 key;
 
-            self._editingInProcess = true;
+            if (!skipCommand) {
+                // fire a command event if not supressed
+                args = self.trigger(COMMAND, { commandName: INSERT, cancel: false });
+                if (args.cancel) {
+                    return;
+                }
+            }
 
-            args = self.trigger(COMMAND, { commandName: INSERT, cancel: false });
-
-            if (args.cancel) {
+            // if there is sorting, reset the sorting and 
+            // go to the first page of the pager if any
+            if (dataSource.sort && dataSource.sort.length > 0) {
+                dataSource.sort = [];
+                self._sortingInProgress = true;
+                // update the pager manually in order to prevent read
+                if (self.pager) {
+                    dataSource.skip = 0;
+                    dataSource.take = self.pager.pageSize();
+                    self.pager.refresh(true);
+                }
+                // read the data source once, and call the same function 
+                // again when done reading, indicating to it not to fire the insert command again
+                dataSource.read().always(proxy(self._toolbar._insertButtonClicked, self, e, true));
                 return;
             }
 
+            self._editingInProcess = true;
+
             if (newRowPosition === "pagebottom") {
-                // insert at the bottom of the page
-                index = mathMax(0, self.contentTable.find("tbody > tr").length - 1);
+                // insert at the bottom of the page - this will add it before the last item on the page,
+                // which (the last item) will be moved to the next page and the new one will appear last
+                index = mathMax(0, self.contentTable.find(">tbody > tr").length - 1);
+
+                // if no pagination, or no next page, insert as last
+                if (!options.paging || (self.pager && !self.pager.hasNext())) {
+                    index += 1;
+                    insertLast = true;
+                }
             }
             else {
                 // insert at the top of the page
                 index = 0;
             }
 
-            // insert an empty item
-            model = dataSource.insertView(index, {});
+            // insert an empty item at the specified position - either at the end, or in a page
+            model = insertLast ? dataSource.add({}) : dataSource.insertView(index, {});
 
             // make all fields in the model null
             for (key in model.fields) {
@@ -266,9 +369,15 @@
 
             self._editing._insertedItems.push(model);
 
-            row = self.contentTable.find("tbody > tr").eq(index);
+            row = self.contentTable.find(">tbody > tr").eq(index);
 
-            self._editing._putRowInEditMode(row, 0);
+            if (self.options.editing.mode != "popup") {
+                self._editing._putRowInEditMode(row, 0);
+            }
+            else {
+                self._initializePopupForm(0, true);
+            }
+
             self.trigger(INSERT);
         },
 
@@ -276,7 +385,7 @@
         _saveButtonClicked: function (e) {
             var self = this,
                 rowIndex,
-                editableCells = self.contentTable.find(".sui-editable-cell"),
+                editableCells = self.contentTable.find(">tbody > tr > .sui-editable-cell"),
                 args;
 
             if (editableCells.length > 0) {
@@ -311,8 +420,7 @@
         // initialize template and instantiate it into the toolbar
         _initializeTemplate: function (toolbar, container) {
             var self = this,
-                template = toolbar.template,
-                isNull = is["null"];
+                template = toolbar.template;
 
             // if template is defined (string or function) - use it for the cell value, 
             // otherwise use the format string or function.
@@ -331,7 +439,8 @@
         },
 
         destroy: function () {
-            this._grid = null;
+            // WARNING: making this null might nullify other grid references
+            //this._grid = null;
         }
     });
 
@@ -345,13 +454,16 @@
             self._grid = grid;
             self.options = options;
 
+            self._eventNS = ".shieldGridEditing" + iid();
+
             self._editors = {};
             self._insertedItems = [];
+
             if (options.enabled) {
                 self._initEditing();
             }
 
-            self._grid.dataSource.on(ERROR, self._dsErrorHandler = proxy(self._dsError, self));
+            self._grid.dataSource.on(ERROR + self._eventNS, proxy(self._dsError, self));
         },
 
         _dsError: function (e) {
@@ -366,19 +478,21 @@
         _initEditing: function () {
             var self = this,
                 options = self.options,
-                optionsEvent = options.event;
+                optionsEvent = options.event,
+                eventNS = self._eventNS;
 
             if (isUndefined(optionsEvent)) {
                 return;
             }
+
             if (optionsEvent === "click") {
-                self._grid.element.on(CLICK, ".sui-cell", self._editingTriggeredHandler = proxy(self._editingTriggered, self));
+                self._grid.element.on(CLICK + eventNS, ".sui-cell", proxy(self._editingTriggered, self));
             }
             else if (optionsEvent === "doubleclick") {
-                self._grid.element.on(DOUBLECLICK, ".sui-cell", self._editingTriggeredHandler = proxy(self._editingTriggered, self));
+                self._grid.element.on(DOUBLECLICK + eventNS, ".sui-cell", proxy(self._editingTriggered, self));
             }
 
-            $(doc).on(CLICK, self._documentClickedHandler = proxy(self._documentClicked, self));
+            $(doc).on(CLICK + eventNS, proxy(self._documentClicked, self));
         },
 
         // update previous item which was in edit mode and put current item in edit mode
@@ -394,14 +508,14 @@
                 isBatch = options.batch,
                 editableCells,
                 currentRowIndex,
-                args = self._grid.trigger(COMMAND, { commandName: EDIT, cancel: false, row: row, cell: cell });
+                args = self._grid.trigger(COMMAND, { commandName: EDIT, cancel: false, row: row, cell: cell, index: self._grid._getRowIndex(row) });
 
             if (args.cancel) {
                 return;
             }
 
             if (isBatch) {
-                editableCells = self._grid.contentTable.find(".sui-editable-cell");
+                editableCells = self._grid.contentTable.find(">tbody > tr > .sui-editable-cell");
                 if (editableCells.length > 0) {
                     rowIndex = editableCells.get(0).parentNode.rowIndex;
 
@@ -424,7 +538,7 @@
                         self._grid._populateInsertedItem = false;
 
                         if (currentRowIndex === rowIndex) {
-                            cell = self._grid.contentTable.find("tbody > tr").eq(rowIndex).get(0).cells[cell.cellIndex];
+                            cell = self._grid.contentTable.find(">tbody > tr").eq(rowIndex).get(0).cells[cell.cellIndex];
                         }
 
                         rowIndex = currentRowIndex;
@@ -442,7 +556,7 @@
                 }
                 else {
                     // error when options.type is not "row" or "cell"
-                    shield.error("Invalid editing.type declaration. The editing.type must be 'row' or 'cell'.", this.options.dieOnError);
+                    shield.error("Invalid editing.type declaration. The editing.type must be 'row' or 'cell'.", options.dieOnError);
                 }
             }
             else {
@@ -453,7 +567,7 @@
                 }
                 else {
                     if (isUndefined(mode) || mode === 'inline') {
-                        editableCells = self._grid.contentTable.find(".sui-editable-cell");
+                        editableCells = self._grid.contentTable.find(">tbody > tr > .sui-editable-cell");
                         if (editableCells.length > 0) {
                             rowIndex = editableCells.get(0).parentNode.rowIndex;
 
@@ -467,7 +581,7 @@
                                 self._grid._closeAllEditedRows();
 
                                 if (currentRowIndex === rowIndex) {
-                                    cell = self._grid.contentTable.find("tbody > tr").eq(rowIndex).get(0).cells[cell.cellIndex];
+                                    cell = self._grid.contentTable.find(">tbody > tr").eq(rowIndex).get(0).cells[cell.cellIndex];
                                 }
 
                                 rowIndex = currentRowIndex;
@@ -485,13 +599,13 @@
                         }
                         else {
                             // error when options.type is not "row" or "cell"
-                            shield.error("Invalid editing.type declaration. The editing.type must be 'row' or 'cell'.", this.options.dieOnError);
+                            shield.error("Invalid editing.type declaration. The editing.type must be 'row' or 'cell'.", options.dieOnError);
                         }
                     }
                 }
             }
 
-            self._grid.trigger(EDIT, { row: row, cell: cell });
+            self._grid.trigger(EDIT, { row: row, cell: cell, index: self._grid._getRowIndex(row) });
         },
 
         _documentClicked: function (e) {
@@ -501,8 +615,7 @@
                 editableCells,
                 rowIndex;
 
-            if (self._grid._editingInProcess ||
-                self._grid._preventClosingEditors) {
+            if (self._grid._editingInProcess || self._grid._preventClosingEditors) {
                 self._grid._editingInProcess = false;
                 return;
             }
@@ -512,10 +625,13 @@
                 !target.parents().hasClass("sui-calendar") &&
                 !target.parents().hasClass("sui-listbox")) {
 
-                editableCells = this._grid.contentTable.find(".sui-editable-cell");
+                editableCells = self._grid.contentTable.find(">tbody > tr > .sui-editable-cell");
+
                 if (editableCells.length > 0) {
                     rowIndex = editableCells.get(0).parentNode.rowIndex;
+
                     var allUpdatedCellsKyes = self._grid._updateItem(rowIndex, null);
+
                     if (self._errorDuringEdit) {
                         self._errorDuringEdit = false;
                         return;
@@ -533,7 +649,7 @@
             }
         },
 
-        _getColumnIndex: function(cell) {
+        _getColumnIndex: function (cell) {
             // get column index from cell index
             return cell.cellIndex - $(cell.parentNode).find(".sui-indent-cell, .sui-expand-cell, .sui-expand-cell-disabled, .sui-collapse-cell").length;
         },
@@ -543,17 +659,22 @@
                 columnIndex = self._getColumnIndex(cell),
                 grid = self._grid,
                 ds = grid.dataSource,
-                dataItem, 
+                dataItem,
                 column = grid.columns[columnIndex],
                 rows,
-                i;
- 
+                i,
+                shouldFocusControl = false;
+
             if (!column || !column.field) {
                 return;
             }
 
+            if (column.editable === false) {
+                return;
+            }
+
             if (ds.group && ds.group.length > 0) {
-                rows = self._grid.contentTable.find(".sui-row, .sui-alt-row");
+                rows = self._grid.contentTable.find(">tbody > tr > .sui-row, >tbody > tr > .sui-alt-row");
                 for (i = 0; i < rows.length; i++) {
                     if (rows[i] == cell.parentNode) {
                         rowIndex = i;
@@ -563,10 +684,6 @@
             }
 
             dataItem = ds.editView(rowIndex).data;
-
-            var columnType = ds.schema.options.fields[column.field].type,
-                value = get(dataItem, column.field),
-                shouldFocusControl = false;
 
             if (arguments.length > 2) {
                 if (arguments[2] == columnIndex) {
@@ -581,6 +698,9 @@
                 self._instantiateCustomEditor(column, cell, dataItem, rowIndex, shouldFocusControl);
             }
             else {
+                var columnType = isDefined(ds.schema.options.fields) ? ds.schema.options.fields[column.field].type : String,
+                    value = get(dataItem, column.field);
+
                 switch (columnType) {
                     case Number:
                         self._instantiateNumeric(cell, value, shouldFocusControl);
@@ -595,8 +715,12 @@
                         self._instantiateCheckBox(cell, value, shouldFocusControl);
                         break;
                     default:
+                        break;
                 }
             }
+
+            // focus the first focusable element in the cell
+            focusFirst(cell);
         },
 
         _prepareCell: function (cell) {
@@ -605,13 +729,21 @@
                 .addClass("sui-editable-cell");
         },
 
-        _instantiateCustomEditor: function (column, cell, dataItem, index, shouldFocusControl) {
+        _instantiateCustomEditor: function (column, cell, dataItem, index, shouldFocusControl, _field) {
             var self = this,
-                cellIndex = self._getColumnIndex(cell),
-                field = self._grid.columns[cellIndex].field,
+                cellIndex,
+                field,
                 value;
 
-            self._prepareCell(cell);
+            if (!_field) {
+                cellIndex = self._getColumnIndex(cell);
+                field = self._grid.columns[cellIndex].field;
+
+                self._prepareCell(cell);
+            }
+            else {
+                field = _field;
+            }
 
             value = column.editor.call(self._grid, cell, dataItem, index, shouldFocusControl);
 
@@ -619,15 +751,24 @@
             self._editors[field] = "custom";
         },
 
-        _instantiateNumeric: function (cell, value, shouldFocusControl) {
+        _instantiateNumeric: function (cell, value, shouldFocusControl, _field) {
             var self = this,
                 input,
-                wrapperInput = $("<input />"),
-                cellIndex = self._getColumnIndex(cell),
+                wrapperInput,
+                cellIndex,
+                field;
+
+            if (!_field) {
+                cellIndex = self._getColumnIndex(cell);
                 field = self._grid.columns[cellIndex].field;
 
-            self._prepareCell(cell);
+                self._prepareCell(cell);
+            }
+            else {
+                field = _field;
+            }
 
+            wrapperInput = $('<input name="' + field + '"/>');
             wrapperInput.appendTo(cell);
 
             var args = self._grid.trigger(EDITORCREATING, { field: field, options: {} });
@@ -644,15 +785,24 @@
             }
         },
 
-        _instantiateDatePicker: function (cell, value, shouldFocusControl) {
+        _instantiateDatePicker: function (cell, value, shouldFocusControl, _field) {
             var self = this,
-               input,
-               wrapperInput = $("<input />"),
-               cellIndex = self._getColumnIndex(cell),
-               field = self._grid.columns[cellIndex].field;
+                input,
+                wrapperInput,
+                cellIndex,
+                field;
 
-            self._prepareCell(cell);
+            if (!_field) {
+                cellIndex = self._getColumnIndex(cell);
+                field = self._grid.columns[cellIndex].field;
 
+                self._prepareCell(cell);
+            }
+            else {
+                field = _field;
+            }
+
+            wrapperInput = $('<input name="' + field + '"/>');
             wrapperInput.appendTo(cell);
 
             var args = self._grid.trigger(EDITORCREATING, { field: field, options: {} });
@@ -669,19 +819,27 @@
             }
         },
 
-        _instantiateTextBox: function (cell, value, shouldFocusControl) {
+        _instantiateTextBox: function (cell, value, shouldFocusControl, _field) {
             var self = this,
                 input,
-                wrapperInput = $("<input type='text' />"),
-                cellIndex = self._getColumnIndex(cell),
+                wrapperInput,
+                cellIndex,
+                field;
+
+            if (!_field) {
+                cellIndex = self._getColumnIndex(cell);
                 field = self._grid.columns[cellIndex].field;
+                self._prepareCell(cell);
+            }
+            else {
+                field = _field;
+            }
 
-            self._prepareCell(cell);
-
+            wrapperInput = $('<input type="text" name="' + field + '"/>');
             wrapperInput.appendTo(cell);
 
             var args = self._grid.trigger(EDITORCREATING, { field: field, options: {} });
-            var options = extend({}, args.options, { value: value });
+            var options = extend({}, args.options, { value: value, cls: "sui-input-textbox" });
 
             if (shield.ui.TextBox) {
                 input = new shield.ui.TextBox(wrapperInput, options);
@@ -694,15 +852,23 @@
             }
         },
 
-        _instantiateCheckBox: function (cell, value, shouldFocusControl) {
+        _instantiateCheckBox: function (cell, value, shouldFocusControl, _field) {
             var self = this,
                 input,
-                wrapperInput = $("<input type='checkbox' />"),
-                cellIndex = self._getColumnIndex(cell),
+                wrapperInput,
+                cellIndex,
+                field;
+
+            if (!_field) {
+                cellIndex = self._getColumnIndex(cell);
                 field = self._grid.columns[cellIndex].field;
+                self._prepareCell(cell);
+            }
+            else {
+                field = _field;
+            }
 
-            self._prepareCell(cell);
-
+            wrapperInput = $('<input type="checkbox" name="' + field + '"/>');
             wrapperInput.appendTo(cell);
 
             var args = self._grid.trigger(EDITORCREATING, { field: field, options: {} });
@@ -729,23 +895,26 @@
 
             for (i = 0; i < cells.length; i++) {
                 self._putCellInEditMode(
-                    cells[i], 
-                    row.get(0).rowIndex, 
+                    cells[i],
+                    row.get(0).rowIndex,
                     // NOTE: for determining this index, see how the _getColumnIndex works
                     cellIndex - row.find(".sui-indent-cell, .sui-expand-cell, .sui-expand-cell-disabled, .sui-collapse-cell").length
                 );
             }
 
+            // focus the first focusable element in the row
+            focusFirst(row);
+
             buttonsCells = row.find(".sui-edit");
             if (buttonsCells.length > 0) {
-                self._grid._changeEditColumnButtons(row.get(0).rowIndex, $(row.find(".sui-button-cell")[0]));
+                self._grid._changeEditColumnButtons(row.get(0).rowIndex, $(row.children(".sui-button-cell")[0]));
             }
         },
 
         _destroyRow: function (rowIndex) {
             var self = this,
                 grid = self._grid,
-                row = grid.contentTable.find("tbody > tr").eq(rowIndex),
+                row = grid.contentTable.find(">tbody > tr").eq(rowIndex),
                 columns = grid.columns,
                 i,
                 colEditor;
@@ -766,12 +935,14 @@
         destroy: function () {
             var self = this,
                 i,
-                el;
+                el,
+                eventNS = self._eventNS;
 
-            self._grid.dataSource.off(ERROR, self._dsErrorHandler);
-            self._grid.element.off(CLICK, ".sui-cell", self._editingTriggeredHandler);
-            self._grid.element.off(DOUBLECLICK, ".sui-cell", self._editingTriggeredHandler);
-            $(doc).off(CLICK, self._documentClickedHandler);
+            self._grid.dataSource.off(ERROR + eventNS);
+
+            self._grid.element.off(eventNS, ".sui-cell");
+
+            $(doc).off(CLICK + eventNS);
 
             if (self._editors) {
                 for (i = 0; i < self._editors.length; i++) {
@@ -781,12 +952,10 @@
                 }
             }
 
-            self._editingTriggeredHandler =
-                self._dsErrorHandler =
-                self._documentClickedHandler =
-                self._grid =
-                self._errorDuringEdit =
-                self.options = null;
+            // WARNING: making this null might nullify other grid references
+            //self._grid = null;
+
+            self._errorDuringEdit = self.options = null;
         }
     });
 
@@ -798,6 +967,12 @@
 
             if (isString(options)) {
                 self.field = options;
+                self.resizable = true;
+                self.sortable = true;
+                self.filterable = true;
+                self.editable = true;
+                self.visible = true;
+                self.locked = false;
             }
             else if (isObject(options)) {
                 self.field = options.field;
@@ -806,7 +981,7 @@
                 self.width = options.width;
                 self.minWidth = options.minWidth;
                 self.maxWidth = options.maxWidth;
-                self.resizable = options.resizable != null ? !!options.resizable : true;
+                self.resizable = isDefined(options.resizable) ? !!options.resizable : true;
                 self.attributes = options.attributes;
                 self.headerAttributes = options.headerAttributes;
                 self.headerTemplate = options.headerTemplate;
@@ -816,20 +991,26 @@
                 self.buttons = options.buttons;
                 self.editor = options.editor;
                 self.customFilter = options.customFilter;
-                self.sortable = options.sortable;
-                self.filterable = options.filterable;
+                self.sortable = isDefined(options.sortable) ? !!options.sortable : true;
+                self.filterable = isDefined(options.filterable) ? !!options.filterable : true;
+                self.editable = isDefined(options.editable) ? !!options.editable : true;
+                self.visible = isDefined(options.visible) ? !!options.visible : true;
+                self.locked = self.visible ? !!options.locked : false;
             }
         },
+
         destroy: function () {
             var self = this;
 
             if (self.buttons) {
                 self.buttons.length = 0;
             }
+
             // set the fields to null
             self.field =
                 self.title =
                 self.editor =
+                self.editable =
                 self.format =
                 self.width =
                 self.minWidth =
@@ -844,6 +1025,8 @@
                 self.groupFooterTemplate =
                 self.sortable =
                 self.filterable =
+                self.visible = 
+                self.locked = 
                 self.columnTemplate = null;
         }
     });
@@ -864,7 +1047,10 @@
             self.grid = grid;
             self.options = extend(true, {}, ColumnResizing.fn.options);
 
-            grid.headerTable.on(MOUSEMOVE + self.options.ns, ".sui-headercell", proxy(self._showHandle, self));
+            // make the event NS unique
+            self._eventNS = self.options.ns + iid();
+
+            grid.headerTable.on(MOUSEMOVE + self._eventNS, ".sui-headercell", proxy(self._showHandle, self));
         },
 
         _showHandle: function (e) {
@@ -878,10 +1064,10 @@
                 handle = self.handle,
                 x = e.pageX,
                 params = self.params = self._params($(e.currentTarget)),
-                isAtNextCellEdge = x >= params.offset.left && x <= (params.offset.left + options.offset) && params.header.index() > 0;
+                isAtNextCellEdge = x >= params.offset.left && x <= (params.offset.left + options.offset) && params.headerIndex > 0;
 
             if (params.isRtl) {
-                isAtNextCellEdge = x >= (params.offset.left + params.width - options.offset) && x <= (params.offset.left + params.width) && params.header.index() > 0;
+                isAtNextCellEdge = x >= (params.offset.left + params.width - options.offset) && x <= (params.offset.left + params.width) && params.headerIndex > 0;
             }
 
             // cursor is at leftmost edge of the header -> use the previous header
@@ -889,14 +1075,14 @@
                 params = self.params = self._params(params.header.prev());
             }
 
-            if (!params.column.resizable) {
+            if (!params.column || !params.column.resizable || params.column.locked) {
                 return;
             }
 
             if (x >= params.threshold && x <= params.edge + options.offset) {
                 if (!handle) {
                     handle = self.handle = $('<div class="sui-resizable-handle"/>')
-                        .on(MOUSEDOWN + options.ns, proxy(self._down, self))
+                        .on(MOUSEDOWN + self._eventNS, proxy(self._down, self))
                         .appendTo(params.header.parents(".sui-headercontent"));
                 }
 
@@ -920,14 +1106,15 @@
                 isRtl = support.isRtl(self.grid.element),
                 width = header.outerWidth(),
                 edge = offset.left + (isRtl ? options.width : width),
-                index = header.index(),
-                column = self.grid.columns[index],
-                min = column.minWidth >= 0 ? +column.minWidth : options.min,
-                max = column.maxWidth >= min ? +column.maxWidth : null;
+                headerIndex = header.index(),
+                // WARNING: calling private method on the Grid class
+                column = self.grid._getColumnByField(header.attr("data-field")),
+                min = column ? (column.minWidth >= 0 ? +column.minWidth : options.min) : null,
+                max = column ? (column.maxWidth >= min ? +column.maxWidth : null) : null;
 
             return {
                 header: header,
-                index: index,
+                headerIndex: headerIndex,
                 column: column,
                 min: min,
                 max: max,
@@ -949,12 +1136,12 @@
                 params = self.params,
                 selector;
 
-            //do not trigger for any button other than left button
+            // do not trigger for any button other than left button
             if (e.button > 1 || !params) {
                 return;
             }
 
-            selector = "> colgroup col:nth-child(" + (params.index + 1) + ")";
+            selector = "> colgroup col:nth-child(" + (params.headerIndex + 1) + ")";
 
             params.origin = e.pageX;
 
@@ -963,12 +1150,13 @@
                 .add(grid.contentTable.find(selector));
 
             self.resizing = true;
+            self._cancelled = null;
 
             self.handle.hide();
 
             $(doc)
-                .on(MOUSEMOVE + self.options.ns, proxy(self._move, self))
-                .on(MOUSEUP + self.options.ns, proxy(self._up, self));
+                .on(MOUSEMOVE + self._eventNS, proxy(self._move, self))
+                .on(MOUSEUP + self._eventNS, proxy(self._up, self));
 
             shield.selection(false);
 
@@ -978,54 +1166,76 @@
         _move: function (e) {
             var self = this,
                 params = self.params,
-                diff = (params.isRtl ? -1 : 1) * (e.pageX - params.origin),
-                width = mathMax(params.width + diff, params.min);
+                diff,
+                width,
+                commandArgs;
+
+            if (!self.resizing) {
+                return;
+            }
+
+            diff = (params.isRtl ? -1 : 1) * (e.pageX - params.origin);
+            width = mathMax(params.width + diff, params.min);
 
             if (params.max) {
                 width = mathMin(width, params.max);
             }
 
-            // clean up if, by any chance, MOUSEMOVE has fired before MOUSEDOWN
-            if (!self.resizing) {
-                self._up();
+            // trigger a command and cancel if requested
+            commandArgs = self.grid.trigger(COMMAND, {commandName: COLUMN_RESIZE, cancel: false, field: params.column.field, width: width});
+            if (commandArgs && commandArgs.cancel) {
+                self._cancelled = true;
                 return;
             }
 
             if (width !== params.current) {
                 params.cols.width(params.current = width);
+
+                // WARNING: calling private methods on the Grid class
+                // adjust the row heights, passing true to reinitialize scrolling
+                self.grid._fixHeaderPadding();
+                self.grid._adjustHeightsLocked(true);
             }
         },
 
         _up: function () {
             var self = this,
                 grid = self.grid,
-                index = self.params.index,
-                width = self.params.current,
-                column = grid.columns[index] || {},
-                columnOption = (grid.options.columns || [])[index] || {};
+                params = self.params,
+                width = params.current,
+                column = params.column || {},
+                columnOption = (grid.options.columns || [])[$(grid.columns).index(column)] || {};
 
             self.resizing = false;
             self.params = null;
 
             column.width = columnOption.width = width + "px";
 
-            $(doc).off(self.options.ns);
+            $(doc).off(self._eventNS);
 
             shield.selection(true);
+
+            // fire the column resize event
+            if (self._cancelled !== true) {
+                grid.trigger(COLUMN_RESIZE, {field: column.field, width: width});
+            }
+
+            self._cancelled = null;
         },
 
         destroy: function () {
             var self = this;
 
-            self._up();
+            self.grid.headerTable.off(self._eventNS);
 
-            self.grid.headerTable.off(self.options.ns);
+            // WARNING: making this null might nullify other grid references
+            //self.grid = null;
 
-            self.grid = null;
+            self._cancelled = null;
 
             if (self.handle) {
                 self.handle
-                    .off(self.options.ns)
+                    .off(self._eventNS)
                     .remove();
 
                 self.handle = null;
@@ -1041,6 +1251,8 @@
             self.grid = grid;
             self._filters = {};
 
+            self._eventNS = ".shieldGridFiltering" + iid();
+
             self._createFilterRow();
         },
 
@@ -1049,7 +1261,7 @@
                 grid = self.grid,
                 table = grid.headerTable,
                 thead = table.find(">thead"),
-                tr = $("<tr class='sui-filter-row' />"),
+                tr,
                 indentCellsCount = thead.find(".sui-indent-cell").length,
                 schema = grid.dataSource.schema,
                 columnType,
@@ -1057,28 +1269,29 @@
                 cell,
                 columns = grid.columns,
                 fields,
-                i,
-                j;
+                i;
+
+            self._tr = tr = $('<tr class="sui-filter-row"/>');
 
             for (i = 0; i < indentCellsCount; i++) {
-                $('<th class="sui-indent-cell">').appendTo(tr);
+                $('<th class="sui-indent-cell"/>').appendTo(tr);
             }
 
             if (schema && schema.options.fields) {
                 fields = schema.options.fields;
             }
 
-            for (j = 0; j < columns.length; j++) {
-                columnType = fields ? fields[columns[j].field].type : null;
+            for (i = 0; i < columns.length; i++) {
+                columnType = fields && fields[columns[i].field] ? fields[columns[i].field].type : null;
 
-                dataField = columns[j].field ? columns[j].field.replace(/[\"\']/g, "@") : '';
-                cell = $("<th class='sui-filter-cell'  data-field='" + dataField + "' />");
-                cell.appendTo(tr);
+                dataField = columns[i].field ? columns[i].field.replace(/[\"\']/g, "@") : '';
+                cell = $('<th class="sui-filter-cell" data-field="' + dataField + '" role="gridcell" tabindex="-1"/>')
+                    .appendTo(tr);
 
-                if (columns[j].filterable !== false) {
+                if (columns[i].filterable !== false) {
                     // add filtering controls only if dataField defined
                     if (dataField.length > 0) {
-                        self._initializeEditor(cell, columnType, columns[j].field, columns[j]);
+                        self._initializeEditor(cell, columnType, columns[i].field, columns[i]);
                         self._appendFilterButton(cell);
                     }
                 }
@@ -1086,7 +1299,25 @@
 
             tr.appendTo(thead);
 
-            $(doc).on(CLICK, self._documentClickedHandler = proxy(self._documentClicked, self));
+            $(doc).on(CLICK + self._eventNS, proxy(self._documentClicked, self));
+
+            // init the default filter state
+            for (i = 0; i < columns.length; i++) {
+                dataField = columns[i].field ? columns[i].field.replace(/[\"\']/g, "@") : '';
+                if (columns[i].filterable !== false) {
+                    if (dataField.length > 0) {
+                        var filter = self._getFilter(columns[i].field);
+
+                        if (filter) {
+                            // set filter value to the filter input
+                            self._setEditorValue(columns[i].field, columns[i], filter.value);
+
+                            // show a remove filter button for that field column
+                            self._addRemoveFilterButton(columns[i].field);
+                        }
+                    }
+                }
+            }
         },
 
         _documentClicked: function (e) {
@@ -1095,26 +1326,32 @@
                 top;
 
             if (self.listBox && !$(e.target).hasClass("sui-filter-button") && !$(e.target).hasClass("sui-filter-button-content")) {
+                var parent = self.listBox.element.parent();
+
+                if (parent.css(DISPLAY) == NONE) {
+                    return;
+                }
+
                 self._filterByField = null;
-                height = self.listBox.element.parent().height();
-                top = self.listBox.element.parent().offset().top;
+                height = parent.height();
+                top = parent.offset().top;
                 if (self._slideUp) {
-                    self.listBox.element.parent().animate({
+                    parent.animate({
                         height: 0,
                         top: top + height
                     }, 150, function () {
-                        self.listBox.element.parent().css({
-                            display: "none",
+                        parent.css({
+                            display: NONE,
                             height: height
                         });
                     });
                 }
                 else {
-                    self.listBox.element.parent().animate({
+                    parent.animate({
                         height: 0
                     }, 150, function () {
-                        self.listBox.element.parent().css({
-                            display: "none",
+                        parent.css({
+                            display: NONE,
                             height: height
                         });
                     });
@@ -1124,7 +1361,7 @@
 
         _appendFilterButton: function (cell) {
             if (shield.ui.Button) {
-                var wrapperButton = $('<button type="button"><span class="sui-sprite sui-filter-button-content"></span></button>')
+                var wrapperButton = $('<button type="button"><span class="sui-sprite sui-filter-button-content"/></button>')
                     .appendTo(cell);
 
                 // build the button with the given options
@@ -1145,18 +1382,37 @@
                 top,
                 schema = grid.dataSource.schema,
                 filtering = grid.options.filtering,
-                stringFunc = filtering.stringFunc ? filtering.stringFunc : [{ "func": "eq", "name": "Equal to" }, { "func": "neq", "name": "Not equal to" }, { "func": "con", "name": "Contains" },
-                    { "func": "notcon", "name": "Not contains" }, { "func": "starts", "name": "Starts with" }, { "func": "ends", "name": "Ends with" }, { "func": "gt", "name": "Greater than" },
-                    { "func": "lt", "name": "Less than" }, { "func": "gte", "name": "Greater than or equal" }, { "func": "lte", "name": "Less than or equal" }, { "func": "isnull", "name": "Is null" }, { "func": "notnull", "name": "Is not null" }],
-                nonStingFunc = filtering.nonStingFunc ? filtering.nonStingFunc : [{ "func": "eq", "name": "Equal to" }, { "func": "neq", "name": "Not equal to" }, { "func": "gt", "name": "Greater than" },
-                    { "func": "lt", "name": "Less than" }, { "func": "gte", "name": "Greater than or equal" }, { "func": "lte", "name": "Less than or equal" }, { "func": "isnull", "name": "Is null" },
-                    { "func": "notnull", "name": "Is not null" }];
+                stringFunc = filtering.stringFunc ? filtering.stringFunc : [
+                    { "func": "eq", "name": "Equal to" }, 
+                    { "func": "neq", "name": "Not equal to" }, 
+                    { "func": "con", "name": "Contains" },
+                    { "func": "notcon", "name": "Not contains" }, 
+                    { "func": "starts", "name": "Starts with" }, 
+                    { "func": "ends", "name": "Ends with" }, 
+                    { "func": "gt", "name": "Greater than" },
+                    { "func": "lt", "name": "Less than" }, 
+                    { "func": "gte", "name": "Greater than or equal" }, 
+                    { "func": "lte", "name": "Less than or equal" }, 
+                    { "func": "isnull", "name": "Is null" }, 
+                    { "func": "notnull", "name": "Is not null" }
+                ],
+                nonStingFunc = filtering.nonStingFunc ? filtering.nonStingFunc : [
+                    { "func": "eq", "name": "Equal to" }, 
+                    { "func": "neq", "name": "Not equal to" }, 
+                    { "func": "gt", "name": "Greater than" },
+                    { "func": "lt", "name": "Less than" }, 
+                    { "func": "gte", "name": "Greater than or equal" }, 
+                    { "func": "lte", "name": "Less than or equal" }, 
+                    { "func": "isnull", "name": "Is null" },
+                    { "func": "notnull", "name": "Is not null" }
+                ],
+                field = e.target.element.parent().attr("data-field").replace(/[@]/g, "'");
 
-            var field = e.target.element.parent().attr("data-field").replace(/[@]/g, "'");
             self._filterByField = field;
+
             if (schema && schema.options.fields) {
                 var fields = schema.options.fields;
-                if (fields[field].type == String) {
+                if (fields && fields[field] && fields[field].type === String) {
                     data = stringFunc;
                 }
                 else {
@@ -1168,10 +1424,9 @@
             }
 
             if (shield.ui.ListBox) {
-
                 if (!self.listBox) {
-
-                    self._menuWrapper = $("<div style='display: none;' />").appendTo(doc.body);
+                    self._menuWrapper = $('<div style="display:none;"/>')
+                        .appendTo(doc.body);
 
                     self.listBox = new shield.ui.ListBox(self._menuWrapper, extend({}, {}, {
                         dataSource: {
@@ -1189,8 +1444,9 @@
 
                     if (self.grid.element.parent().hasClass("sui-rtl")) {
                         self.listBox.element.parent().addClass("sui-rtl");
-                    } else {
-                        self.listBox.element.parent().css("display", "none");
+                    }
+                    else {
+                        self.listBox.element.parent().css(DISPLAY, NONE);
                     }
                 }
 
@@ -1199,7 +1455,6 @@
                 self._positionListBox(e);
 
                 if (self._slideUp) {
-
                     top = e.target.element.offset().top - height;
                     self.listBox.element.parent().css({
                         top: e.target.element.offset().top
@@ -1217,27 +1472,35 @@
                 }
             }
 
-            self._selectFilterMenuValue();
+            self._selectFilterMenuValue(field);
         },
 
-        _selectFilterMenuValue: function () {
+        _getFilter: function(field) {
             var self = this,
-                field = self._filterByField,
                 filter = self.grid.dataSource.filter,
                 andFilter,
-                selectedValue;
+                result,
+                i;
 
             if (filter && filter.and && filter.and.length > 0) {
                 andFilter = filter.and;
-                for (var i = 0; i < andFilter.length; i++) {
+                for (i = 0; i < andFilter.length; i++) {
                     if (andFilter[i].path === field) {
-                        selectedValue = andFilter[i].filter;
+                        result = andFilter[i];
                     }
                 }
             }
 
-            if (selectedValue) {
-                self.listBox.values(selectedValue);
+            return result;
+        },
+
+        _selectFilterMenuValue: function (field) {
+            var self = this,
+                filter = self._getFilter(field),
+                selectedFilter = filter ? filter.filter : UNDEFINED;
+
+            if (selectedFilter) {
+                self.listBox.values(selectedFilter);
             }
             else {
                 self.listBox.clearSelection();
@@ -1249,15 +1512,16 @@
                 andFilterArr,
                 args,
                 shouldPushFilter = true,
-                value = self._filters[self._filterByField] == "@@custom" ? "@@custom" : self._filters[self._filterByField].value(),
+                value = self._filters[self._filterByField] == CUSTOM_FILTER ? CUSTOM_FILTER : self._filters[self._filterByField].value(),
                 func = e.item.func,
                 currentFilter = { path: self._filterByField, filter: func, value: value };
 
-            if (value == "@@custom") {
+            if (value == CUSTOM_FILTER) {
                 args = self.grid.trigger(GETCUSTOMFILTERVALUE, { field: self._filterByField, value: null });
                 value = args.value;
                 currentFilter = { path: self._filterByField, filter: func, value: value };
             }
+
             if ((value === "" || value === null) &&
                 func != "notnull" && func != "isnull") {
                 return;
@@ -1287,27 +1551,28 @@
 
             self.grid.dataSource.read();
 
-            self._addRemoveFilterButton();
+            self._addRemoveFilterButton(self._filterByField);
         },
 
-        _addRemoveFilterButton: function () {
+        _addRemoveFilterButton: function (field) {
             var self = this,
                 cells,
                 $cell,
                 cell;
 
             if (shield.ui.Button) {
-                cells = self.grid.headerTable.find(".sui-filter-row > th");
+                cells = $(self._tr).children("th");
 
                 for (var i = 0; i < cells.length; i++) {
                     $cell = $(cells[i]);
 
-                    if ($cell.attr("data-field") && ($cell.attr("data-field").replace(/[@]/g, "'") == self._filterByField)) {
+                    if ($cell.attr("data-field") && ($cell.attr("data-field").replace(/[@]/g, "'") == field)) {
                         cell = cells[i];
                         break;
                     }
                 }
-                if ($cell.find(".sui-clear-filter-button").length === 0) {
+
+                if ($cell && $cell.find(".sui-clear-filter-button").length === 0) {
                     var wrapperButton = $('<button type="button"><span class="sui-sprite sui-clear-filter-button-content"></span></button>')
                         .appendTo(cell);
 
@@ -1326,9 +1591,10 @@
             var self = this,
                 element,
                 field = e.target.element.parent().attr("data-field").replace(/[@]/g, "'"),
-                filters = self.grid.dataSource.filter.and;
+                filters = self.grid.dataSource.filter.and,
+                i;
 
-            for (var i = 0; i < filters.length; i++) {
+            for (i = 0; i < filters.length; i++) {
                 if (filters[i].path == field) {
                     filters.splice(i, 1);
                 }
@@ -1338,12 +1604,13 @@
             e.target.destroy();
             element.remove();
 
-            if (self._filters[field] != "@@custom") {
+            if (self._filters[field] != CUSTOM_FILTER) {
                 self._filters[field].value(null);
             }
             else {
                 self.grid.trigger(CLEARFILTER, { field: field, value: null });
             }
+
             self.grid.dataSource.read();
         },
 
@@ -1390,12 +1657,23 @@
             });
         },
 
-        _initializeEditor: function (cell, columnType, field, column) {
+        _setEditorValue: function(field, column, value) {
             var self = this,
-                value;
+                control;
+
+            if (!column.customFilter) {
+                control = self._filters[field];
+                if (control) {
+                    control.value(value);
+                }
+            }
+        },
+
+        _initializeEditor: function (cell, columnType, field, column) {
+            var self = this;
 
             if (column.customFilter) {
-                self._filters[field] = "@@custom";
+                self._filters[field] = CUSTOM_FILTER;
                 column.customFilter.call(self, cell);
             }
             else {
@@ -1419,12 +1697,9 @@
         _instantiateNumeric: function (cell, field) {
             var self = this,
                 input,
-                wrapperInput = $("<input />");
-
-            wrapperInput.appendTo(cell);
-
-            var args = self.grid.trigger(FILTERWIDGETCREATING, { field: field, options: {} });
-            var options = extend({}, args.options);
+                wrapperInput = $('<input/>').appendTo(cell),
+                args = self.grid.trigger(FILTERWIDGETCREATING, { field: field, options: {} }),
+                options = extend({}, args.options);
 
             if (shield.ui.NumericTextBox) {
                 input = new shield.ui.NumericTextBox(wrapperInput, options);
@@ -1434,13 +1709,10 @@
 
         _instantiateDatePicker: function (cell, field) {
             var self = this,
-               input,
-               wrapperInput = $("<input />");
-
-            wrapperInput.appendTo(cell);
-
-            var args = self.grid.trigger(FILTERWIDGETCREATING, { field: field, options: {} });
-            var options = extend({}, args.options);
+                input,
+                wrapperInput = $('<input/>').appendTo(cell),
+                args = self.grid.trigger(FILTERWIDGETCREATING, { field: field, options: {} }),
+                options = extend({}, args.options);
 
             if (shield.ui.DatePicker) {
                 input = new shield.ui.DatePicker(wrapperInput, options);
@@ -1451,12 +1723,9 @@
         _instantiateTextBox: function (cell, field) {
             var self = this,
                 input,
-                wrapperInput = $("<input type='text' />");
-
-            wrapperInput.appendTo(cell);
-
-            var args = self.grid.trigger(FILTERWIDGETCREATING, { field: field, options: {} });
-            var options = extend({}, args.options);
+                wrapperInput = $('<input type="text"/>').appendTo(cell),
+                args = self.grid.trigger(FILTERWIDGETCREATING, { field: field, options: {} }),
+                options = extend({}, args.options);
 
             if (shield.ui.TextBox) {
                 input = new shield.ui.TextBox(wrapperInput, options);
@@ -1468,26 +1737,29 @@
             var self = this,
                 key;
 
-            self.grid = null;
+            // WARNING: making this null might nullify other grid references
+            //self.grid = null;
 
             for (key in self._filters) {
                 if (self._filters.hasOwnProperty(key)) {
-                    self._filters[key].destroy();
+                    if (self._filters[key] != CUSTOM_FILTER) {
+                        self._filters[key].destroy();
+                    }
                     self._filters[key] = null;
                 }
             }
+
             if (self.listBox) {
                 self.listBox.destroy();
                 self.listBox = null;
             }
 
-            $(doc).off(CLICK, self._documentClickedHandler);
+            $(self._menuWrapper).remove();
+            $(self._tr).remove();
 
-            self._filterByField =
-            self._documentClickedHandler =
-            self._filters =
-            self._slideUp =
-            self._menuWrapper = null;
+            $(doc).off(CLICK + self._eventNS);
+
+            self._filterByField = self._filters = self._slideUp = self._menuWrapper = self._tr = null;
         }
     });
 
@@ -1499,6 +1771,8 @@
 
             self.grid = grid;
             self.sortExpressions = [];
+
+            self._eventNS = ".shieldGridSorting" + iid();
 
             if (isBoolean(options)) {
                 self.allowUnsort = true;
@@ -1519,19 +1793,25 @@
         },
 
         destroy: function () {
-            var self = this;
+            var self = this,
+                headerTable = self.grid.headerTable;
 
             self.allowUnsort = self.multiple = self.sortExpressions = null;
             self.length = 0;
 
-            if (self._click) {
-                self.grid.headerTable.find(".sui-link").each(function () {
-                    $(this).off(CLICK, self._click);
-                });
-                self._click = null;
-            }
+            // remove all links added by sorting
+            headerTable.find(".sui-headercell .sui-link").each(function() {
+                $(this).parent().html($(this).html());
+            });
 
-            self.grid = null;
+            headerTable.off(self._eventNS);
+
+            // remove all span elements in the header that have a class starting with sui-
+            // (those are the up/down arrows added by the sorting)
+            headerTable.find('.sui-headercell span[class^="sui-"]').remove();
+
+            //self.grid = null;
+            // WARNING: making this null might nullify other grid references
         },
 
         _initialize: function () {
@@ -1539,44 +1819,60 @@
                 grid = self.grid,
                 dsSort = grid.dataSource.sort,
                 columns = grid.columns,
-                headerCells = grid.headerTable.find(".sui-headercell");
+                columnHeaderCells = {},
+                headerCells = grid.headerTable.find(".sui-headercell"),
+                i,
+                j,
+                currentSort;
 
-            self._click = proxy(self._clickHandler, self);
+            headerCells.each(function () {
+                var headerCell = $(this),
+                    fieldName = headerCell.attr('data-field'),
+                    // WARNING: calling private method on Grid
+                    column = grid._getColumnByField(fieldName),
+                    text;
 
-            headerCells.each(function (index) {
-                var that = $(this),
-                    text = that.html();
+                columnHeaderCells[fieldName] = headerCell;
 
-                if (columns[index].sortable !== false) {
+                if (column && column.sortable !== false) {
+                    text = headerCell.html();
+                    headerCell.empty();
 
-                    that.empty();
-                    $('<a href="#" class="sui-link"></a>')
-                        .appendTo(that)
-                        .html(text)
-                        .on(CLICK, self._click);
+                    // ARIA
+                    headerCell.removeAttr(ARIA_SORT);
+
+                    $('<a href="#" class="sui-link sui-unselectable" unselectable="on" tabindex="-1"/>')
+                        .appendTo(headerCell)
+                        .html(text);
                 }
             });
 
+            grid.headerTable.on(CLICK + self._eventNS, '.sui-link', proxy(self._clickHandler, self));
+
             if (dsSort) {
-                for (var i = 0; i < dsSort.length; i++) {
-                    var currentSort = dsSort[i];
-                    for (var j = 0; j < columns.length; j++) {
+                for (i = 0; i < dsSort.length; i++) {
+                    currentSort = dsSort[i];
+                    for (j = 0; j < columns.length; j++) {
                         if (columns[j].sortable !== false) {
                             if (currentSort.path == columns[j].field) {
-                                var link = $(headerCells[j]).find(".sui-link"),
-                                    sufix = "ascending",
+                                var headerCell = $(columnHeaderCells[columns[j].field]),
+                                    link = headerCell.find(".sui-link"),
+                                    suffix = ASCENDING,
                                     cssClass = "sui-asc",
                                     text = self.ascText;
 
                                 if (currentSort.desc) {
-                                    sufix = "descending";
+                                    suffix = DESCENDING;
                                     text = self.descText;
                                     cssClass = "sui-desc";
                                 }
 
+                                // ARIA
+                                $(headerCell).attr(ARIA_SORT, suffix);
+
                                 link.addClass(cssClass);
 
-                                $('<span class="sui-' + sufix + '">' + text + '</span>')
+                                $('<span class="sui-' + suffix + '">' + text + '</span>')
                                     .appendTo(link);
                             }
                         }
@@ -1589,8 +1885,8 @@
             var self = this,
                 element = $(e.target).closest(".sui-link"),
                 grid = self.grid,
-                columnIndex = inArray(element.parent().get(0), grid.headerTable.find(".sui-headercell")),
-                column = grid.columns[columnIndex];
+                // WARNING: calling private method on Grid
+                column = grid._getColumnByField(element.parent().attr('data-field'));
 
             if (element.hasClass("sui-desc")) {
                 if (self.allowUnsort && self.firstAscending) {
@@ -1633,7 +1929,7 @@
                         dsSort.length = 0;
                     }
                     else {
-                        var item = $.grep(dsSort, function (e) {
+                        var item = grep(dsSort, function (e) {
                             return (e.path === column.field && e.desc === (unsort ? desc : !desc));
                         });
 
@@ -1653,6 +1949,7 @@
                     }
                 }
 
+                // WARNING: calling private method on Grid
                 grid._refreshOnSort();
 
                 grid.trigger(SORT, { column: column, desc: desc, unsort: unsort });
@@ -1661,14 +1958,14 @@
 
         _sort: function (fieldName, desc, unsort) {
             var self = this,
-              grid = self.grid,
-              dataSource = grid.dataSource,
-              item,
-              dsSort = dataSource.sort,
-              index;
+                grid = self.grid,
+                dataSource = grid.dataSource,
+                dsSort = dataSource.sort,
+                item,
+                index;
 
             if (dsSort) {
-                item = $.grep(dsSort, function (e) { return (e.path === fieldName && e.desc === desc); });
+                item = grep(dsSort, function (e) { return (e.path === fieldName && e.desc === desc); });
             }
 
             if (!item || item.length <= 0) {
@@ -1677,34 +1974,37 @@
                 }
 
                 if (dsSort) {
-                    var showldRefresh = false;
-                    var currentItem = $.grep(dsSort, function (e) { return (e.path === fieldName && e.desc != desc); });
+                    var shouldRefresh = false,
+                        currentItem = grep(dsSort, function (e) { return (e.path === fieldName && e.desc != desc); });
+
                     if (currentItem && currentItem.length > 0) {
                         index = inArray(currentItem[0], dsSort);
                         dsSort.splice(index, 1);
-                        showldRefresh = true;
+                        shouldRefresh = true;
                     }
                     if (!unsort) {
                         dsSort.push({ path: fieldName, desc: desc });
-                        showldRefresh = true;
+                        shouldRefresh = true;
                     }
 
-                    if (showldRefresh) {
+                    if (shouldRefresh) {
+                        // WARNING: calling private method on Grid
                         grid._refreshOnSort();
                     }
                 }
                 else {
                     if (!unsort) {
                         dataSource.sort = [{ path: fieldName, desc: desc }];
+                        // WARNING: calling private method on Grid
                         grid._refreshOnSort();
                     }
                 }
-
             }
             else {
                 if (unsort) {
                     index = inArray(item[0], dsSort);
                     dsSort.splice(index, 1);
+                    // WARNING: calling private method on Grid
                     grid._refreshOnSort();
                 }
             }
@@ -1714,83 +2014,117 @@
 
     // Selection class
     var Selection = Class.extend({
-        init: function (headertable, table, options, grid) {
-            var self = this;
+        init: function (options, grid) {
+            var self = this,
+                eventNS;
+
+            eventNS = self._eventNS = ".shieldGridSelection" + iid();
 
             if (isBoolean(options)) {
                 self.type = "row";
                 self.multiple = false;
                 self.toggle = false;
                 self.spreadsheet = true;
+                self.drawArea = false;
+                self.disableTextSelection = false;
+                self._selectOnMouseDown = false;
             }
             else if (isObject(options)) {
                 self.type = options.type ? options.type : "row";
-                self.multiple = options.multiple;
-                self.toggle = options.toggle ? options.toggle : false;
-                self.spreadsheet = isUndefined(options.spreadsheet) ? true : options.spreadsheet;
+                self.multiple = !!options.multiple;
+                self.toggle = isDefined(options.toggle) ? options.toggle : false;
+                self.spreadsheet = isDefined(options.spreadsheet) ? options.spreadsheet : true;
+                self.drawArea = isDefined(options.drawArea) ? options.drawArea : options.multiple;
+                self.disableTextSelection = isDefined(options.disableTextSelection) ? options.disableTextSelection : false;
+                self._selectOnMouseDown = !self.drawArea && (options.selectEvent == MOUSEDOWN);
             }
 
-            self.parentGrid = grid;
-
-            table.addClass(SELECTABLE);
-            headertable.addClass("sui-non-selectable");
-            self.table = table;
+            self.grid = grid;
             self.lastSelected = null;
 
-            table.on(MOUSEDOWN, self._mouseDown = proxy(self._mouseDownHandler, self));
-            table.on(MOUSEMOVE, self._mouseMove = proxy(self._mouseMoveHandler, self));
+            $(grid.headerTable).add(grid.frozenHeaderTable)
+                .addClass("sui-non-selectable");
 
-            $(doc).on(MOUSEUP, self._mouseUp = proxy(self._mouseUpHandler, self));
+            $(grid.contentTable).add(grid.frozenContentTable)
+                .addClass(SELECTABLE);
+
+            $(grid.contentTable).add(grid.frozenContentTable)
+                .on(MOUSEDOWN + eventNS, proxy(self._mouseDownHandler, self))
+                .on(MOUSEMOVE + eventNS, proxy(self._mouseMoveHandler, self));
+
+            $(doc).on(MOUSEUP + eventNS, proxy(self._mouseUpHandler, self));
 
             // hack for IE<10, the older version of IE do not recognize user-select: none; or -ms-user-select: none;
             if (isIE) {
-                table.on("selectstart", self._selectStart = function () { return false; });
+                $(grid.contentTable).add(grid.frozenContentTable)
+                    .on(SELECTSTART + eventNS, function () { return false; });
             }
-            if (self.multiple) {
-                self.area = $(doc.createElement('span'));
-                self.area.addClass("sui-area sui-area-color");
+
+            if (self.multiple && self.drawArea) {
+                self.area = $(doc.createElement('span'))
+                    .addClass("sui-area sui-area-color");
             }
         },
 
         destroy: function () {
-            var self = this;
-            self.parentGrid = null;
-            self.type = null;
-            self.multiple = null;
-            self.lastSelected = null;
-            self.toggle = null;
-            self.spreadsheet = null;
-            self.table.off(MOUSEDOWN, self._mouseDown);
-            self._mouseDown = null;
-            self.table.off(MOUSEMOVE, self._mouseMove);
-            self._mouseMove = null;
-            self.table.off(MOUSEUP, self._mouseUp);
-            $(doc).off(MOUSEUP, self._mouseUp);
-            self._mouseUp = null;
-            self.x = null;
-            self.y = null;
-            self.table.off("selectstart", self._selectStart);
-            self._selectStart = null;
-            self.elements = null;
-            self.table = null;
+            var self = this,
+                eventNS = self._eventNS,
+                grid = self.grid;
+
+            $(grid.contentTable).add(grid.frozenContentTable)
+                .off(eventNS);
+
+            $(doc).off(eventNS);
+
             if (self.area) {
                 self.area.remove();
-                self.area = null;
             }
+
+            // WARNING: making this null might nullify other grid references
+            //self.grid = null;
+
+            self.type = 
+                self.multiple = 
+                self.lastSelected = 
+                self.toggle = 
+                self.spreadsheet = 
+                self.area = 
+                self.x = 
+                self.y = 
+                self.elements = null;
         },
 
         select: function (el) {
-            var self = this;
+            var self = this,
+                elements,
+                elementsLen,
+                curr,
+                i;
 
             if (el) {
-                el.each(function () {
-                    self._selectElement($(this));
-                });
+                elements = $(el);
+                elementsLen = elements.length;
+                
+                if (elementsLen > 0) {
+                    for (i=0; i<elementsLen; i++) {
+                        curr = $(elements.get(i));
+
+                        // select the element
+                        self._selectElement(curr);
+
+                        // if last element in the selection list, save it, so that shift selection works
+                        if (i == elementsLen-1) {
+                            self.lastSelected = curr;
+                        }
+                    }
+                }
 
                 return;
             }
 
-            return self.table.find("." + SELECTED);
+            // return the selected elements from the content table 
+            // (nothing from the frozen one will be returned)
+            return self.grid.contentTable.find("." + SELECTED);
         },
 
         clear: function () {
@@ -1818,27 +2152,31 @@
 
         _mouseDownHandler: function (e) {
             var self = this,
+                grid = self.grid,
                 x = e.pageX,
                 y = e.pageY,
-                current = $(e.target);
+                current = $(e.target),
+                parentTable = self._getParentTable(current);
 
             self.x = x;
             self.y = y;
 
-            if (current[0].nodeName.toUpperCase() == "TD" &&
-                self._getParentTable(current) != self.table[0]) {
+            if (current[0].nodeName.toUpperCase() == "TD" && parentTable != $(grid.contentTable)[0] && parentTable != $(grid.frozenContentTable)[0]) {
                 return;
             }
 
-            if ((current.hasClass("sui-cell") || current.hasClass("sui-row") || current.hasClass("sui-alt-row")) &&
-                         !current.hasClass("sui-detail-cell") &&
-                         !current.hasClass("sui-detail-row") &&
-                         !current.hasClass("sui-collapse-cell") &&
-                         !current.hasClass("sui-expand-cell") &&
-                         !current.hasClass("sui-expand-cell-disabled") &&
-                         !current.hasClass("sui-indent-cell")) {
-
-                if (self.multiple) {
+            if ((
+                    current.hasClass("sui-cell") || current.hasClass("sui-row") || current.hasClass("sui-alt-row") || 
+                    isEventTargetInsideCell(e, grid.contentTable) || isEventTargetInsideCell(e, grid.frozenContentTable)
+                ) &&
+                !current.hasClass("sui-detail-cell") &&
+                !current.hasClass("sui-detail-row") &&
+                !current.hasClass("sui-collapse-cell") &&
+                !current.hasClass("sui-expand-cell") &&
+                !current.hasClass("sui-expand-cell-disabled") &&
+                !current.hasClass("sui-indent-cell")
+            ) {
+                if (self.multiple && self.drawArea) {
                     self.area
                         .appendTo(doc.body)
                         .css({
@@ -1849,11 +2187,18 @@
                         });
                 }
 
-                $(doc).on(MOUSEMOVE, self._mouseMove);
+                $(doc).on(MOUSEMOVE + self._eventNS, proxy(self._mouseMoveHandler, self));
 
-                shield.selection(false);
+                if (self.drawArea || self.disableTextSelection) {
+                    shield.selection(false);
+                }
 
-                self.elements = getElementsFromEvent(e, self.table);
+                self.elements = getElementsFromEvent(e, grid.contentTable, grid.frozenContentTable);
+
+                // if event element and selection to be done on mousedown and element is not selected, perform and process it now
+                if (self.elements && self._selectOnMouseDown && !elementsSelected(self.elements)) {
+                    self._performAndProcessSelection(e);
+                }
             }
         },
 
@@ -1870,56 +2215,28 @@
                 width: abs(x - self.x),
                 height: abs(y - self.y)
             };
-            if (self.multiple) {
+
+            if (self.multiple && self.drawArea) {
                 self.area.css(position);
             }
-            e.preventDefault();
+
+            // do we need this?
+            //e.preventDefault();
         },
 
         _mouseUpHandler: function (e) {
             var self = this,
-                isCtrlPressed = e.ctrlKey,
-                area = self.area,
-                elements = self.elements,
-                i;
+                area = self.area;
 
-            $(doc).off(MOUSEMOVE, self._mouseMove);
+            $(doc).off(MOUSEMOVE + self._eventNS);
 
-            shield.selection(true);
+            if (self.drawArea || self.disableTextSelection) {
+                shield.selection(true);
+            }
 
-            if (elements) {
-                self.elementsToBeSelected = [];
-
-                if (self.type == "row") {
-                    self._performRowSelection(area, isCtrlPressed, elements, e);
-                }
-                else {
-                    self._performCellSelection(area, isCtrlPressed, elements, e)
-                }
-                var toBeSelected = [];
-                for (i = 0; i < self.elementsToBeSelected.length; i++) {
-                    var current = self.elementsToBeSelected[i];
-                    if ((current.hasClass("sui-cell") || current.hasClass("sui-row") || current.hasClass("sui-alt-row")) &&
-                        !current.hasClass("sui-detail-cell") &&
-                        !current.hasClass("sui-detail-row") &&
-                        !current.hasClass("sui-collapse-cell") &&
-                        !current.hasClass("sui-expand-cell") &&
-                        !current.hasClass("sui-expand-cell-disabled") &&
-                        !current.hasClass("sui-indent-cell")) {
-                        toBeSelected.push(current);
-                    }
-                }
-
-                var args = self.parentGrid.trigger(COMMAND, { commandName: SELECTIONCHANGED, cancel: false, toBeSelected: toBeSelected });
-
-                if (!args.cancel) {
-                    for (i = 0; i < toBeSelected.length; i++) {
-                        self._selectElement(toBeSelected[i]);
-                    }
-
-                    self.parentGrid.trigger(SELECTIONCHANGED);
-                    self.elements = null;
-                }
+            // if event element and selection not on mousedown or element is selected, perform and process it now - in the mouseup event
+            if (self.elements && (!self._selectOnMouseDown || elementsSelected(self.elements))) {
+                self._performAndProcessSelection(e);
             }
 
             if (area) {
@@ -1927,8 +2244,89 @@
             }
         },
 
+        _performAndProcessSelection: function(e) {
+            var self = this,
+                grid = self.grid,
+                area = self.area,
+                elements = self.elements,
+                isCtrlPressed = e.ctrlKey,
+                toBeSelected = [],
+                viewIndices = [],
+                indices = [],
+                current,
+                currViewIndex,
+                args,
+                i;
+
+            // fire the selectionChanging command
+            args = grid.trigger(COMMAND, {
+                commandName: SELECTIONCHANGING,
+                cancel: false
+            });
+
+            if (args.cancel) {
+                self.elements = null;
+                return;
+            }
+
+            self.elementsToBeSelected = [];
+
+            if (self.type == "row") {
+                self._performRowSelection(area, isCtrlPressed, elements, e);
+            }
+            else {
+                self._performCellSelection(area, isCtrlPressed, elements, e)
+            }
+
+            for (i = 0; i < self.elementsToBeSelected.length; i++) {
+                current = self.elementsToBeSelected[i];
+
+                if (
+                    (current.hasClass("sui-cell") || current.hasClass("sui-row") || current.hasClass("sui-alt-row")) &&
+                    !current.hasClass("sui-detail-cell") &&
+                    !current.hasClass("sui-detail-row") &&
+                    !current.hasClass("sui-collapse-cell") &&
+                    !current.hasClass("sui-expand-cell") &&
+                    !current.hasClass("sui-expand-cell-disabled") &&
+                    !current.hasClass("sui-indent-cell")
+                ) {
+                    // add the row and information about its indices
+                    toBeSelected.push(current);
+
+                    // add indices of the rows of the selected rows or cells
+                    // WARNING: calling private method on Grid
+                    currViewIndex = grid._getRowIndex(self.type == "row" ? current : $(current).parent());
+                    viewIndices.push(currViewIndex);
+                    indices.push(currViewIndex >= 0 ? grid.dataSource.getDataIndex(currViewIndex) : currViewIndex);
+                }
+            }
+
+            args = grid.trigger(COMMAND, {
+                commandName: SELECTIONCHANGED,
+                cancel: false,
+                toBeSelected: toBeSelected,
+                viewIndices: viewIndices,
+                indices: indices
+            });
+
+            if (!args.cancel) {
+                for (i = 0; i < toBeSelected.length; i++) {
+                    self._selectElement(toBeSelected[i]);
+                }
+
+                grid.trigger(SELECTIONCHANGED, {
+                    selected: toBeSelected,
+                    viewIndices: viewIndices,
+                    indices: indices
+                });
+
+                self.elements = null;
+            }
+        },
+
         _performRowSelection: function (area, isCtrlPressed, elements, e) {
             var self = this;
+
             if ($(e.target).hasClass("sui-expand-cell") ||
                 $(e.target).hasClass("sui-expand-cell-disabled") ||
                 $(e.target).hasClass("sui-collapse-cell") ||
@@ -1936,7 +2334,8 @@
                 ($(e.target).parent().hasClass("sui-expand-cell") || $(e.target).parent().hasClass("sui-expand-cell-disabled") || $(e.target).parent().hasClass("sui-collapse-cell")))) {
                 return;
             }
-            if (area && (area.height() === 0 && area.width() === 0)) {
+
+            if (!self.drawArea || e.type === KEYDOWN || (area && area.height() === 0 && area.width() === 0)) {
                 if (self.multiple) {
                     self._processMultiRowSelection(e, elements);
                 }
@@ -1948,10 +2347,8 @@
                 self._processSingleRowSelection(e, elements);
             }
             else {
-
-                var rows = self.table.find(">tbody > tr");
-
-                var last = null;
+                var rows = self.grid.contentTable.find(">tbody > tr"),
+                    last = null;
 
                 each(rows, function (index, item) {
                     var row = $(item),
@@ -1965,12 +2362,14 @@
                 if (!isCtrlPressed) {
                     self._clearSelectedRows();
                 }
+
                 self._selectRowRange(elements.row.rowIndex, last, isCtrlPressed);
             }
         },
 
         _performCellSelection: function (area, isCtrlPressed, elements, e) {
             var self = this;
+
             if ($(e.target).hasClass("sui-expand-cell") ||
                 $(e.target).hasClass("sui-expand-cell-disabled") ||
                 $(e.target).hasClass("sui-collapse-cell") ||
@@ -1978,41 +2377,37 @@
                 ($(e.target).parent().hasClass("sui-expand-cell") || $(e.target).parent().hasClass("sui-expand-cell-disabled") || $(e.target).parent().hasClass("sui-collapse-cell")))) {
                 return;
             }
-            if (area && area.height() === 0 && area.width() === 0) {
-                {
-                    if (self.multiple) {
-                        self._processMultiCellSelection(e, elements);
-                    }
-                    else {
-                        self._processSingleCellSelection(e, elements);
-                    }
+
+            if (!self.drawArea || e.type === KEYDOWN || (area && area.height() === 0 && area.width() === 0)) {
+                if (self.multiple) {
+                    self._processMultiCellSelection(e, elements);
+                }
+                else {
+                    self._processSingleCellSelection(e, elements);
                 }
             }
             else if (!self.multiple) {
                 self._processSingleCellSelection(e, elements);
             }
             else {
-                var cells = self.table.find(">tbody > tr > td");
+                var cells = self.grid.contentTable.find(">tbody > tr > td"),
+                    toBeSelected = [],
+                    i;
 
-                var toBeSelected = [];
                 each(cells, function (index, item) {
                     var cell = $(item),
                         cellWidth = cell.get(0).clientWidth,
                         cellHeight = cell.get(0).clientHeight,
-
                         cellTopY = cell.offset().top,
                         cellLeftY = cell.offset().left,
                         cellBottomY = cellTopY + cellHeight,
                         cellRightX = cellLeftY + cellWidth,
-
                         leftX = mathMin(e.pageX, self.x),
                         rightX = mathMax(e.pageX, self.x),
                         topY = mathMin(e.pageY, self.y),
                         bottomY = mathMax(e.pageY, self.y),
-
                         qualifyX = false,
                         qualifyY = false;
-
 
                     if (cellTopY < topY) {
                         if (cellBottomY > topY) {
@@ -2040,10 +2435,12 @@
                         toBeSelected.push(item);
                     }
                 });
+
                 if (!isCtrlPressed) {
                     self._clearSelectedCells();
                 }
-                for (var i = 0; i < toBeSelected.length; i++) {
+
+                for (i = 0; i < toBeSelected.length; i++) {
                     var selectedCell = $(toBeSelected[i]);
                     if (selectedCell.hasClass(SELECTED)) {
                         self._deselectElement($(toBeSelected[i]));
@@ -2059,49 +2456,59 @@
             var self = this,
                 start = mathMin(startRowIdex, endRowIndex),
                 end = mathMax(startRowIdex, endRowIndex),
-                rows = self.table.find(">tbody > tr");
+                contentRows = self.grid.contentTable.find(">tbody > tr"),
+                i,
+                contentRow;
 
-            for (var i = start; i <= end; i++) {
-                var row = $(rows[i]);
+            for (i = start; i <= end; i++) {
+                contentRow = $(contentRows[i]);
+
                 if (isCtrlPressed) {
-                    if (row.hasClass(SELECTED)) {
-                        self._deselectElement(row);
+                    if (contentRow.hasClass(SELECTED)) {
+                        self._deselectElement(contentRow);
                     }
                     else {
-                        self.elementsToBeSelected.push(row);
+                        self.elementsToBeSelected.push(contentRow);
                     }
                 }
                 else {
-                    self.elementsToBeSelected.push(row);
+                    self.elementsToBeSelected.push(contentRow);
                 }
             }
         },
 
         _clearSelectedRows: function () {
             var self = this,
-                selectedRows = self.table.find(">tbody>tr." + SELECTED);
+                grid = self.grid;
 
-            each(selectedRows, function (index, item) {
-                self._deselectElement($(item));
+            $(grid.frozenContentTable).find("> tbody > tr." + SELECTED).each(function() {
+                self._deselectElement($(this));
+            });
+
+            $(grid.contentTable).find("> tbody > tr." + SELECTED).each(function() {
+                self._deselectElement($(this));
             });
         },
 
         _clearSelectedCells: function () {
             var self = this,
-                selectedCells = self.table.find(">tbody > tr > td." + SELECTED);
+                grid = self.grid;
 
-            each(selectedCells, function (index, item) {
-                self._deselectElement($(item));
+            $(grid.frozenContentTable).find(">tbody > tr > td." + SELECTED).each(function() {
+                self._deselectElement($(this));
+            });
+
+            $(grid.contentTable).find(">tbody > tr > td." + SELECTED).each(function() {
+                self._deselectElement($(this));
             });
         },
 
         _processSingleRowSelection: function (e, elements) {
             var self = this,
-               table = self.table,
-               toggle = self.toggle,
-               multiple = self.multiple,
-               row = $(elements.row),
-               isSelected = row.hasClass(SELECTED);
+                toggle = self.toggle,
+                multiple = self.multiple,
+                row = $(elements.row),
+                isSelected = row.hasClass(SELECTED);
 
             if (!multiple) {
                 self._clearSelectedRows();
@@ -2125,7 +2532,7 @@
 
         _processMultiRowSelection: function (e, elements) {
             var self = this,
-                table = self.table,
+                grid = self.grid,
                 isCtrlPressed = e.ctrlKey,
                 isShifPressed = e.shiftKey,
                 row = $(elements.row);
@@ -2141,11 +2548,12 @@
                 }
             }
             else if (isShifPressed) {
-                var selectedRows = self.table.find(">tbody tr." + SELECTED);
+                var selectedRows = grid.contentTable.find(">tbody > tr." + SELECTED);
+
                 if (self.lastSelected) {
                     var lastSelectedRow = self.lastSelected,
                         last = lastSelectedRow.get(0).rowIndex,
-                        rows = table.find(">tbody > tr"),
+                        rows = grid.contentTable.find(">tbody > tr"),
                         current = row.get(0).rowIndex,
                         from = mathMin(current, last),
                         to = mathMax(current, last);
@@ -2172,16 +2580,16 @@
 
         _processSingleCellSelection: function (e, elements) {
             var self = this,
-               table = self.table,
-               toggle = self.toggle,
-               multiple = self.multiple,
-               cell = $(elements.cell),
-               isSelected = cell.hasClass(SELECTED),
-               lastSelected = self.lastSelected;
+                toggle = self.toggle,
+                multiple = self.multiple,
+                cell = $(elements.cell),
+                isSelected = cell.hasClass(SELECTED),
+                lastSelected = self.lastSelected;
 
             if (!multiple) {
                 self._clearSelectedCells();
             }
+
             if (toggle) {
                 if (isSelected) {
                     self._deselectElement(cell);
@@ -2200,10 +2608,11 @@
 
         _processMultiCellSelection: function (e, elements) {
             var self = this,
-                table = self.table,
+                grid = self.grid,
                 isCtrlPressed = e.ctrlKey,
                 isShifPressed = e.shiftKey,
                 cell = $(elements.cell);
+
             if (isCtrlPressed) {
                 if (cell.hasClass(SELECTED)) {
                     self._deselectElement(cell);
@@ -2217,11 +2626,11 @@
             else if (isShifPressed) {
                 if (self.lastSelected) {
                     var lastSelectedCell = self.lastSelected,
-                        tableElement = self.table.get(0),
+                        tableElement = grid.contentTable.get(0),
                         columnsLength = tableElement.rows[0].cells.length,
                         lastRowIndex = lastSelectedCell.parent().get(0).rowIndex,
                         last = lastRowIndex * columnsLength + lastSelectedCell.get(0).cellIndex,
-                        cells = table.find(">tbody > tr > td"),
+                        cells = grid.contentTable.find(">tbody > tr > td"),
                         currentRowIndex = cell.parent().get(0).rowIndex,
                         current = currentRowIndex * columnsLength + cell.get(0).cellIndex,
                         from = mathMin(current, last),
@@ -2232,7 +2641,7 @@
 
                     if (self.spreadsheet) {
                         var lastSelectedCellIndex = lastSelectedCell[0].cellIndex,
-                        currentCellIndex = cell[0].cellIndex;
+                            currentCellIndex = cell[0].cellIndex;
 
                         from = mathMin(lastSelectedCellIndex, currentCellIndex);
                         to = mathMax(lastSelectedCellIndex, currentCellIndex);
@@ -2240,9 +2649,10 @@
                         var fromRow = mathMin(lastRowIndex, currentRowIndex),
                             toRow = mathMax(lastRowIndex, currentRowIndex);
 
-                        for (i = fromRow ; i <= toRow; i++) {
+                        for (i = fromRow; i <= toRow; i++) {
                             var r = tableElement.rows[i],
                                 j;
+
                             for (j = from; j <= to; j++) {
                                 self.elementsToBeSelected.push($(r.cells[j]));
                             }
@@ -2277,15 +2687,9 @@
         }
     });
 
+
     // GroupReorder class
     var GroupReorder = Class.extend({
-        init: function (grid) {
-            var self = this;
-            self.grid = grid;
-            self.options = extend(true, {}, GroupReorder.fn.options);
-            self._events(true);
-        },
-
         options: {
             ns: ".shieldGridGroupReorder",
             returnDuration: 50,
@@ -2294,16 +2698,27 @@
             draggedTemplate: "<div style='border-color:transparent;' class='sui-grid sui-grid-core'><div class='sui-group-panel-indicator'><span class='sui-group-title'>{0}</span><span class='sui-group-close-button'></span></div></div>"
         },
 
+        init: function (grid) {
+            var self = this;
+
+            self.grid = grid;
+            self.options = extend(true, {}, GroupReorder.fn.options);
+
+            self._eventNS = self.options.ns + iid();
+
+            self._events(true);
+        },
+
         _events: function (on) {
             var self = this,
                 gridElement = self.grid.element;
 
             if (on) {
                 self._downProxy = proxy(self._down, self);
-                gridElement.on(MOUSEDOWN + self.options.ns, ".sui-group-panel-indicator", self._downProxy);
+                gridElement.on(MOUSEDOWN + self._eventNS, ".sui-group-panel-indicator", self._downProxy);
             }
             else {
-                gridElement.off(MOUSEDOWN + self.options.ns, ".sui-group-panel-indicator", self._downProxy);
+                gridElement.off(MOUSEDOWN + self._eventNS, ".sui-group-panel-indicator", self._downProxy);
                 self._downProxy = null;
             }
         },
@@ -2316,7 +2731,6 @@
                 offset = target.offset(),
                 gridEl = self.grid.element,
                 gridOffset = gridEl.offset(),
-                ns = self.options.ns,
                 x = e.pageX,
                 y = e.pageY;
 
@@ -2331,8 +2745,8 @@
             self._upProxy = proxy(self._up, self);
 
             $(doc)
-                .on(MOUSEMOVE + ns, self._moveProxy)
-                .on(MOUSEUP + ns, self._upProxy);
+                .on(MOUSEMOVE + self._eventNS, self._moveProxy)
+                .on(MOUSEUP + self._eventNS, self._upProxy);
 
             self.start = {
                 left: x - offset.left,
@@ -2540,7 +2954,7 @@
 
             self.start = null;
 
-            $(doc).off(options.ns);
+            $(doc).off(self._eventNS);
 
             shield.selection(true);
 
@@ -2553,15 +2967,11 @@
         },
 
         _detachDocumentEvents: function () {
-            var self = this,
-                ns = self.options.ns;
+            var self = this;
 
-            self._moveProxy =
-            self._upProxy = null;
+            self._moveProxy = self._upProxy = null;
 
-            $(doc)
-                .off(MOUSEMOVE + ns, self._moveProxy)
-                .off(MOUSEUP + ns, self._upProxy);
+            $(doc).off(self._eventNS);
         },
 
         destroy: function () {
@@ -2575,14 +2985,6 @@
 
     // ColumnGroupReorder class
     var ColumnGroupReorder = Class.extend({
-        init: function (grid) {
-            var self = this;
-            self.grid = grid;
-            self.options = extend(true, {}, ColumnReorder.fn.options);
-            self._events(true);
-            grid.headerTable.addClass("sui-reorderable");
-        },
-
         options: {
             ns: ".shieldGridColumnGroupReorder",
             returnDuration: 150,
@@ -2591,16 +2993,28 @@
             draggedTemplate: "<div class='sui-grid sui-grid-core'><div class='sui-gridheader'><table class='sui-table'><thead><tr class='sui-columnheader'><th class='sui-headercell'>{0}</th></tr></thead></table></div></div>"
         },
 
+        init: function (grid) {
+            var self = this;
+            self.grid = grid;
+            self.options = extend(true, {}, ColumnReorder.fn.options);
+
+            // make the event ns unique
+            self._eventNS = self.options.ns + iid();
+
+            self._events(true);
+            grid.headerTable.addClass("sui-reorderable");
+        },
+
         _events: function (on) {
             var self = this,
                 gridElement = self.grid.element;
 
             if (on) {
                 self._downProxy = proxy(self._down, self);
-                gridElement.on(MOUSEDOWN + self.options.ns, ".sui-headercell", self._downProxy);
+                gridElement.on(MOUSEDOWN + self._eventNS, ".sui-headercell", self._downProxy);
             }
             else {
-                gridElement.off(MOUSEDOWN + self.options.ns, ".sui-headercell", self._downProxy);
+                gridElement.off(MOUSEDOWN + self._eventNS, ".sui-headercell", self._downProxy);
                 self._downProxy = null;
             }
         },
@@ -2613,7 +3027,6 @@
                 offset = target.offset(),
                 gridEl = self.grid.element,
                 gridOffset = gridEl.offset(),
-                ns = self.options.ns,
                 x = e.pageX,
                 y = e.pageY;
 
@@ -2621,7 +3034,7 @@
             if (e.button > 1) {
                 return;
             }
-             
+
             var field = target.attr("data-field");
             var groups = self.grid.dataSource.group;
             if (groups) {
@@ -2631,10 +3044,10 @@
                     }
                 }
             }
-            
+
             $(doc)
-                .on(MOUSEMOVE + ns, proxy(self._move, self))
-                .on(MOUSEUP + ns, proxy(self._up, self));
+                .on(MOUSEMOVE + self._eventNS, proxy(self._move, self))
+                .on(MOUSEUP + self._eventNS, proxy(self._up, self));
 
             self.start = {
                 left: x - offset.left,
@@ -2783,7 +3196,7 @@
             if (indicator) {
                 indicator.hide();
             }
-       
+
             if (index != null && index > -1) {
                 items.eq(index).addClass("sui-reorder-target");
 
@@ -2861,7 +3274,7 @@
 
             self.start = null;
 
-            $(doc).off(options.ns);
+            $(doc).off(self._eventNS);
 
             shield.selection(true);
 
@@ -2881,14 +3294,6 @@
 
     // ColumnReorder class
     var ColumnReorder = Class.extend({
-        init: function (grid) {
-            var self = this;
-            self.grid = grid;
-            self.options = extend(true, {}, ColumnReorder.fn.options);
-            self._events(true);
-            grid.headerTable.addClass("sui-reorderable");
-        },
-
         options: {
             ns: ".shieldGridColumnReorder",
             returnDuration: 150,
@@ -2897,16 +3302,27 @@
             draggedTemplate: "<div class='sui-grid sui-grid-core'><div class='sui-gridheader'><table class='sui-table'><thead><tr class='sui-columnheader'><th class='sui-headercell'>{0}</th></tr></thead></table></div></div>"
         },
 
+        init: function (grid) {
+            var self = this;
+            self.grid = grid;
+            self.options = extend(true, {}, ColumnReorder.fn.options);
+
+            self._eventNS = self.options.ns + iid();
+
+            self._events(true);
+            grid.headerTable.addClass("sui-reorderable");
+        },
+
         _events: function (on) {
             var self = this,
                 gridElement = self.grid.element;
 
             if (on) {
                 self._downProxy = proxy(self._down, self);
-                gridElement.on(MOUSEDOWN + self.options.ns, ".sui-headercell", self._downProxy);
+                gridElement.on(MOUSEDOWN + self._eventNS, ".sui-headercell", self._downProxy);
             }
             else {
-                gridElement.off(MOUSEDOWN + self.options.ns, ".sui-headercell", self._downProxy);
+                gridElement.off(MOUSEDOWN + self._eventNS, ".sui-headercell", self._downProxy);
                 self._downProxy = null;
             }
         },
@@ -2919,7 +3335,6 @@
                 offset = target.offset(),
                 gridEl = self.grid.element,
                 gridOffset = gridEl.offset(),
-                ns = self.options.ns,
                 x = e.pageX,
                 y = e.pageY;
 
@@ -2929,8 +3344,8 @@
             }
 
             $(doc)
-                .on(MOUSEMOVE + ns, proxy(self._move, self))
-                .on(MOUSEUP + ns, proxy(self._up, self));
+                .on(MOUSEMOVE + self._eventNS, proxy(self._move, self))
+                .on(MOUSEUP + self._eventNS, proxy(self._up, self));
 
             self.start = {
                 left: x - offset.left,
@@ -3125,7 +3540,7 @@
 
             self.start = null;
 
-            $(doc).off(options.ns);
+            $(doc).off(self._eventNS);
 
             shield.selection(true);
 
@@ -3147,11 +3562,15 @@
     // Grid class encapsulating the main grid logic
     var Grid = Widget.extend({
         // initialization method, called by the framework
-        init: function (element, userOptions) {
+        init: function () {
             // call the parent init
             Widget.fn.init.apply(this, arguments);
 
-            this.refresh();
+            var self = this;
+
+            self._eventNS = ".shieldGrid" + self.getInstanceId();
+
+            self.refresh();
 
             
         },
@@ -3167,7 +3586,8 @@
                 options = self.options,
                 i,
                 key,
-                el;
+                el,
+                eventNS = self._eventNS;
 
             //when the grid is never initialized, there's nothing to destroy
             if (!self.contentWrapper) {
@@ -3183,8 +3603,9 @@
                 self._markedCells = null;
             }
 
-            $(win).off(RESIZE + self._rsNS);
-            self._resize = self._rsNS = null;
+            $(win).off(eventNS);
+
+            self._destroyFrozenContainers();
 
             if (self.sorting) {
                 self.sorting.destroy();
@@ -3196,23 +3617,24 @@
                 self.virtualizedContainer = null;
             }
 
-            for (i = 0; i < self.columns; i++) {
-                self.columns[i].destroy();
+            if (self.columns) {
+                for (i = 0; i < self.columns.length; i++) {
+                    self.columns[i].destroy();
+                }
             }
 
             if (self.contentWrapper) {
-                self.contentWrapper.off(SCROLL, self._hScrollHandler);
+                self.contentWrapper.off(SCROLL);
             }
 
-            self._hScrollHandler =
-                self.scrollableWrapper = null;
+            self.scrollableWrapper = null;
 
             if (self._selectable) {
                 self._selectable.destroy();
                 self._selectable = null;
             }
 
-            if (self.options.scrolling) {
+            if (options.scrolling) {
                 self.contentWrapper.parent().remove();
                 self.headerWrapper.parent().remove();
             }
@@ -3222,13 +3644,21 @@
             }
 
             if (self._hasDetailTemplate()) {
-                self.contentTable
-                    .off(CLICK, ".sui-expand-cell", self._toggleDetailTemplateHandler)
-                    .off(CLICK, ".sui-collapse-cell", self._toggleDetailTemplateHandler);
-                self._toggleDetailTemplateHandler = null;
+                self.contentTable.off(eventNS);
+            }
+
+            if (self.popupWindow) {
+                self.popupWindow.destroy();
+            }
+
+            if (self._footer) {
+                $(self._footer).remove();
+                self._footer = null;
             }
 
             self.columns =
+                self._gridColumns =
+                self._windowEditingIndex =
                 self.contentWrapper =
                 self.headerWrapper =
                 self.contentTable =
@@ -3280,6 +3710,7 @@
             }
 
             self._sortingInProgress =
+                self._loadingVirtualRows = 
                 self._scrollLeft =
                 self._scrollTop =
                 self._populateInsertedItem =
@@ -3301,14 +3732,12 @@
                 self._columnGroupReorder = null;
             }
 
-            // destroy the dataSource last
-            self.dataSource.off(CHANGE, self._dsChange);
-            self.dataSource.off(START, self._dsStart);
-            self._dsChange =
-                self._dsStart =
-                self.dataSource = null;
+            // unbind all DS events added by this instance
+            // NOTE: do not destroy the data source
+            self.dataSource.off(eventNS);
 
             self.element
+                .off(eventNS)
                 .removeClass("sui-grid sui-grid-core")
                 .css(HEIGHT, "")
                 .empty();
@@ -3317,9 +3746,17 @@
         
 
         _resizeHandler: function () {
-            if (this.options.scrolling) {
-                this._scrolling();
-            }
+            var self = this;
+
+            // for frozen
+            self._adjustWidthsLocked();
+            self._adjustHeightsLocked();
+
+            // NOTE: do not reinitialize scrolling, because if we have virtual scrolling,
+            // it will reset the grid and scroll to the top, losing the current scroll
+            //if (this.options.scrolling) {
+            //    this._scrolling();
+            //}
         },
 
         _hasDetailTemplate: function () {
@@ -3337,35 +3774,49 @@
         },
 
         _resolveColumns: function (columns) {
-            var gridColumns = this.columns = [];
+            var self = this,
+                i;
+
+            self.columns = [];
 
             if (is.array(columns)) {
-                each(columns, function (index, item) {
-                    gridColumns.push(new Column(item));
-                });
+                for (i=0; i<columns.length; i++) {
+                    self.columns.push(new Column(columns[i]));
+                }
             }
             else {
                 // error when columns are not array
-                shield.error("Invalid columns declaration. The columns have to be array.", this.options.dieOnError);
+                shield.error("Invalid columns declaration. The columns have to be array.", self.options.dieOnError);
+            }
+
+            // initialize the _gridColumns internal dict
+            self._gridColumns = {};
+            for (i=0; i<self.columns.length; i++) {
+                self._gridColumns[self.columns[i].field] = {
+                    index: i
+                };
             }
         },
 
         _createWrappers: function () {
             var self = this,
-                element = self.element;
+                element = self.element,
+                contentWrapper,
+                headerWrapper;
 
             self._wrapper();
 
-            var contentWrapper = $("<div />").prependTo(element);
+            contentWrapper = $("<div/>").prependTo(element);
             contentWrapper.addClass("sui-gridcontent");
 
-            var headerWrapper = $("<div />").prependTo(element);
+            headerWrapper = $("<div/>").prependTo(element);
             headerWrapper.addClass("sui-gridheader");
 
             if (!self.options.showHeader) {
-                headerWrapper.css("display", "none");
+                headerWrapper.css(DISPLAY, NONE);
                 contentWrapper.addClass("sui-no-header");
             }
+
             self.headerWrapper = headerWrapper;
             self.contentWrapper = contentWrapper;
         },
@@ -3387,32 +3838,36 @@
 
         _createGroupPanel: function () {
             var self = this,
+                grouping = self.options.grouping,
                 groupHeaderElement,
                 group,
                 groupPanel,
                 shouldAttachGroupreordering = false,
-                dataSource = self.dataSource;
+                dataSource = self.dataSource,
+                i;
 
             groupPanel = self.element.find(".sui-group-panel");
             if (groupPanel.length > 0) {
                 groupPanel.remove();
             }
 
-            if (self.options.grouping.showGroupHeader) {
+            if (grouping.showGroupHeader) {
                 if (!dataSource.group ||
                     dataSource.group.length === 0) {
-                    (self.element).prepend($("<div class='sui-group-panel sui-group-panel-empty' >" + self.options.grouping.message + "</div>"));
+                    $(self.element).prepend($('<div class="sui-group-panel sui-group-panel-empty">' + grouping.message + "</div>"));
                 }
                 else {
-                    groupHeaderElement = $("<div class='sui-group-panel' />");
-                    (self.element).prepend(groupHeaderElement);
-                    for (var i = 0; i < dataSource.group.length; i++) {
+                    groupHeaderElement = $('<div class="sui-group-panel"/>');
+
+                    $(self.element).prepend(groupHeaderElement);
+
+                    for (i = 0; i < dataSource.group.length; i++) {
                         group = dataSource.group[i];
                         self._createGroupHeaderIndicator(group, groupHeaderElement);
                         shouldAttachGroupreordering = true;
                     }
 
-                    if (shouldAttachGroupreordering && self.options.grouping.allowDragToGroup) {
+                    if (shouldAttachGroupreordering && grouping.allowDragToGroup) {
                         if (self._groupReorder) {
                             self._groupReorder.destroy();
                         }
@@ -3433,21 +3888,27 @@
                 sortButton,
                 indicator;
 
-            indicator = $("<div class='sui-group-panel-indicator' data-field=\"" + group.field + "\" />").appendTo(groupHeaderElement);
+            indicator = $('<div class="sui-group-panel-indicator" data-field="' + group.field + '"/>')
+                .appendTo(groupHeaderElement);
 
             if (group.order == "desc") {
-                sortButton = $("<span class='sui-descending'>&#9660;</span>").appendTo(indicator);
+                sortButton = $('<span class="sui-descending">&#9660;</span>')
+                    .appendTo(indicator);
             }
             else {
-                sortButton = $("<span class='sui-ascending'>&#9650;</span>").appendTo(indicator);
+                sortButton = $('<span class="sui-ascending">&#9650;</span>')
+                    .appendTo(indicator);
             }
 
-            $("<span class='sui-group-title'>" + group.field + "</span>").appendTo(indicator);
+            $('<span class="sui-group-title">' + group.field + '</span>')
+                .appendTo(indicator);
+
             if (self.options.grouping.allowDragToGroup) {
-                closeButton = $("<span class='sui-group-close-button'>&#10006;</span>").appendTo(indicator);
+                closeButton = $('<span class="sui-group-close-button">&#10006;</span>')
+                    .appendTo(indicator);
                 closeButton.on(CLICK, self._closeButtonClicked = proxy(self._closeButtonClickedHandler, self));
             }
-            sortButton.on(CLICK, self._sortButtonClicked = proxy(self._sortButtonClickedHandler, self));
+            sortButton.on(CLICK, proxy(self._sortButtonClickedHandler, self));
         },
 
         _sortButtonClickedHandler: function (e) {
@@ -3495,7 +3956,7 @@
                 table = headerWrapper.children("table");
 
                 if (!table.length) {
-                    table = $("<table />").appendTo(headerWrapper);
+                    table = $("<table/>").appendTo(headerWrapper);
                 }
             }
 
@@ -3508,7 +3969,7 @@
             self.headerTable = table;
 
             self._createTbody(table, true);
-            self._createThead(table, true);
+            self._createThead(table);
             self._createFakeRow(table, self.columns.length);
         },
 
@@ -3523,7 +3984,7 @@
                 table = contentWrapper.children("table");
 
                 if (!table.length) {
-                    table = $("<table />").appendTo(contentWrapper);
+                    table = $("<table/>").appendTo(contentWrapper);
                 }
             }
 
@@ -3541,8 +4002,13 @@
                 if (self._canExpandCollapse()) {
                     table.addClass("sui-expandable");
                 }
-                table.on(CLICK, ".sui-expand-cell", self._toggleDetailTemplateHandler = proxy(self._expandCollapseDetailTemplate, self));
-                table.on(CLICK, ".sui-collapse-cell", self._toggleDetailTemplateHandler);
+
+                // NOTE: find the proper cells - only those for the main grid (and not for nested ones)
+                table.on(
+                    CLICK + self._eventNS, 
+                    "> tbody > tr > .sui-expand-cell, > tbody > tr > .sui-collapse-cell", 
+                    proxy(self._expandCollapseDetailTemplate, self)
+                );
             }
 
             self.contentTable = table;
@@ -3551,7 +4017,7 @@
         },
 
         _createTbody: function (table, isHeader) {
-            var tbody = table.find(">tbody");
+            var tbody = table.find("> tbody");
 
             if (!tbody.length) {
                 tbody = $("<tbody/>").appendTo(table);
@@ -3573,8 +4039,9 @@
                 html = "",
                 thead = table.find(">thead"),
                 tr,
+                th,
                 text,
-                th;
+                focusable;
 
             if (!thead.length) {
                 thead = $("<thead/>").insertBefore(table.tbody);
@@ -3585,42 +4052,57 @@
             if (!tr.length) {
                 tr = thead.children().first();
                 if (!tr.length) {
-                    tr = $("<tr/>");
+                    tr = $('<tr/>').appendTo(thead);
                 }
             }
 
-            if (!tr.children().length) {
-                for (idx = 0, length = columns.length; idx < length; idx++) {
-                    th = columns[idx];
-                    text = th.headerTemplate || th.title || th.field || th;
-                    html += "<th " + normalizeAttributes(th.headerAttributes) + " data-field=\"" + columns[idx].field+ "\">" + text + "</th>";
+            // ARIA
+            tr.attr(ROLE, "row");
+
+            // empty the tr
+            tr.empty();
+
+            // create the column th-s
+            for (idx = 0, length = columns.length; idx < length; idx++) {
+                th = columns[idx];
+                text = th.headerTemplate || th.title || th.field || th;
+
+                if (columns[idx].sortable) {
+                    focusable = true;
+                }
+                else {
+                    focusable = false;
                 }
 
-                tr.html(html);
+                html += '<th ' + normalizeAttributes(th.headerAttributes) + ' data-field="' + columns[idx].field + '" role="columnheader"' + 
+                    (focusable ? ' tabindex="-1"' : '') + '>' + text + '</th>';
             }
+            tr.html(html);
 
             tr.addClass("sui-columnheader");
             tr.find("th").addClass("sui-headercell");
 
-            // Add indent cell when there is detail template.
+            // prepend an indent cell when there is detail template.
             if (columns.length && self._hasDetailTemplate() && self._canExpandCollapse()) {
-                var indentCell = $('<th class="sui-indent-cell" />');
+                var indentCell = $('<th class="sui-indent-cell"/>');
                 if (isIE7) {
                     indentCell.html("&nbsp;");
                 }
                 indentCell.prependTo(tr);
             }
 
-            tr.appendTo(thead);
-
             table.thead = thead;
         },
 
         _createFakeRow: function (table, count) {
-            var tbody = table.find(">tbody");
+            var tbody = table.find(">tbody"),
+                fakeRow,
+                i;
+
             if (tbody.length) {
-                var fakeRow = $("<tr/>");
-                for (var i = 0; i < count; i++) {
+                fakeRow = $("<tr/>");
+
+                for (i = 0; i < count; i++) {
                     $("<td/>").appendTo(fakeRow);
                 }
 
@@ -3638,70 +4120,110 @@
                 width;
 
             if (!colgroup.length) {
-                colgroup = $("<colgroup/>").prependTo(table);
+                colgroup = $("<colgroup/>")
+                    .prependTo(table);
             }
 
+            // empty the colgroup contents
             colgroup.html("");
+
             // Add indent cell when there is detail template.
             if (options.columns.length && self._hasDetailTemplate() && self._canExpandCollapse()) {
-                $("<col class='sui-indent-col'/>").appendTo(colgroup);
+                $('<col class="sui-indent-col"/>').appendTo(colgroup);
             }
 
             for (i = 0, len = columns.length; i < len; i++) {
                 width = columns[i].width;
 
-                $(
-                    width && parseInt(width, 10) !== 0 ?
-                        shieldFormat('<col style="width:{0}"/>', isString(width) ? width : width + "px") :
-                        "<col />"
-                ).appendTo(colgroup);
+                $((width && parseInt(width, 10) !== 0) ? shieldFormat('<col style="width:{0}"/>', isString(width) ? width : width + "px") : '<col/>')
+                    .data(SUI_FIELDNAME, columns[i].field)
+                    .appendTo(colgroup);
+            }
+        },
+
+        scrollTop: function(value) {
+            var self = this,
+                options = self.options,
+                scrolling = options.scrolling,
+                virtual = self._hasVirtualScrolling(),
+                contentWrapper = self.contentWrapper;
+
+            if (scrolling) {
+                if (isDefined(value)) {
+                    // setter
+                    if (virtual) {
+                        // virtual scrolling
+                        if (self.virtualizedContainer) {
+                            self.virtualizedContainer.scrollTop(value);
+                        }
+                    }
+                    else {
+                        // normal scrolling
+                        $(contentWrapper).scrollTop(value);
+                    }
+                }
+                else {
+                    // getter
+                    if (virtual) {
+                        // virtual scrolling
+                        if (self.virtualizedContainer) {
+                            return self.virtualizedContainer.scrollTop();
+                        }
+                    }
+                    else {
+                        // normal scrolling
+                        return $(contentWrapper).scrollTop();
+                    }
+                }
             }
         },
 
         _scrolling: function () {
             var self = this,
-                element = self.element,
+                options = self.options,
+                element = $(self.element),
+                isRtl = support.isRtl(element),
                 dataSource = self.dataSource,
                 virtual = self._hasVirtualScrolling(),
                 headerWrapper = self.headerWrapper,
                 contentWrapper = self.contentWrapper,
                 headerHeight = headerWrapper.outerHeight(),
+                autoHeight = !virtual && (options.height === "auto" || !isDefined(options.height)),
+                maxHeight = (!virtual && isDefined(options.maxHeight)) ? parseInt(options.maxHeight, 10) : UNDEFINED,
+                elementHeight,
                 wrapperHeight,
-                scrollableWrapper,
-                row,
-                rowHeight;
+                pagerHeight = 0,
+                toolbarsHeight = 0,
+                groupingHeight = 0,
+                scrollableWrapper;
 
-            //do not over-initialize, if the scrolling containers have already been created
+            // do not over-initialize, if the scrolling containers have already been created
             if (!headerWrapper.parent().hasClass("sui-gridheader sui-scrolldiv")) {
                 headerWrapper.addClass("sui-headercontent").removeClass("sui-gridheader");
-                headerWrapper.wrap("<div class='sui-gridheader sui-scrolldiv'></div>");
+                headerWrapper.wrap('<div class="sui-gridheader sui-scrolldiv"/>');
 
                 contentWrapper.addClass("sui-content").removeClass("sui-gridcontent");
-                contentWrapper.wrap("<div class='sui-gridcontent sui-scroller'></div>");
+                contentWrapper.wrap('<div class="sui-gridcontent sui-scroller"/>');
 
                 if (isIE7) {
                     self.headerTable.addClass("sui-table-ie7").removeClass("sui-table");
                     self.contentTable.addClass("sui-table-ie7").removeClass("sui-table");
                 }
 
-                $(self.element).find(".sui-scrolldiv").css((support.isRtl(element) ? "padding-left" : "padding-right"), support.scrollbar() - 1);
-
                 scrollableWrapper = self.scrollableWrapper = virtual ? contentWrapper.parent() : contentWrapper;
 
-                scrollableWrapper.on(SCROLL, self._hScrollHandler = proxy(self._hscroll, self));
+                scrollableWrapper.on(SCROLL, proxy(self._onscroll, self));
             }
             else {
                 headerHeight = headerWrapper.parent().outerHeight();
             }
 
-            wrapperHeight = element.innerHeight() - headerHeight;
-
             if (self.pagerWrapper) {
-                wrapperHeight -= self.pagerWrapper.outerHeight();
+                pagerHeight = self.pagerWrapper.outerHeight();
             }
 
             if (self._toolbar) {
-                var toolbars = self.element.find(".sui-toolbar"),
+                var toolbars = element.find(".sui-toolbar"),
                     sum = 0,
                     i;
 
@@ -3710,68 +4232,116 @@
                 }
 
                 // + 1 because the toolbar has a border
-                wrapperHeight -= sum + 1;
+                toolbarsHeight += sum + 1
             }
 
-            var groupPanel = self.element.find(".sui-group-panel");
+            var groupPanel = element.find(".sui-group-panel");
             if (groupPanel.length > 0) {
-                wrapperHeight -= groupPanel.outerHeight();
+                groupingHeight += groupPanel.outerHeight();
             }
-            //create a jQuery selector with both the contentWrapper and its parent            
-            $(contentWrapper).add(contentWrapper.parent()).css({
-                height: wrapperHeight,
-                width: '100%'
-            });
 
-            if (virtual && dataSource.view && dataSource.view.length) {
-                if (self.virtualizedContainer) {
-                    // NOTE: update the value of total at the virtualizedContainer side,
-                    // so that it updates the height of the virtualized and set proper scrolls
-                    self.virtualizedContainer.options.total = dataSource.total;
-
-                    self.virtualizedContainer.render();
-                }
-                else {
-                    // construct and append the first row to the table body, 
-                    // so that we can take its height, and finally remove it
-                    var dataItem = self.dataSource.view[0];
-                    row = self._renderRow(0, self.contentTable.tbody, dataItem);
-                    rowHeight = row.outerHeight();
-                    row.remove();
-
-                    // construct the virtualized container object
-                    self.virtualizedContainer = new shield.ui.VirtualizedContainer(scrollableWrapper, {
-                        itemHeight: rowHeight,
-                        total: dataSource.total,
-                        createContainer: function (wrapper) {
-                            return wrapper
-                                .addClass("sui-content")
-                                .append(self.contentTable)
-                                .find("tbody")
-                                .empty();
-                        },
-                        getItems: proxy(self._loadVirtualRows, self),
-                        // do not call render in the constructor, 
-                        // we need to delay it in order to access the virtualizedContainer instance
-                        // from the getItems handler
-                        skipRender: true
-                    });
-
-                    // NOTE: call render()
-                    self.virtualizedContainer.render();
-                }
-
-                self.contentWrapper = self.virtualizedContainer.element.children().eq(0);
+            // determine and set the height
+            if (autoHeight) {
+                wrapperHeight = "auto";
             }
             else {
+                elementHeight = element.innerHeight();
+                wrapperHeight = elementHeight - headerHeight - pagerHeight - toolbarsHeight - groupingHeight;
+            }
+
+            $(contentWrapper).add(contentWrapper.parent()).css(HEIGHT, wrapperHeight);
+
+            // check and limit to max height
+            if (maxHeight && maxHeight < element.innerHeight()) {
+                wrapperHeight = maxHeight - headerHeight - pagerHeight - toolbarsHeight - groupingHeight;
+                $(contentWrapper).add(contentWrapper.parent()).css(HEIGHT, wrapperHeight);
+            }
+
+            if (virtual) {
+                self._ensureVirtualizedContainer();
+
+                // NOTE: update the value of total at the virtualizedContainer side,
+                // so that it updates the height of the virtualized and set proper scrolls
+                self.virtualizedContainer.options.total = dataSource.total;
+
+                // render the data
+                self.virtualizedContainer.render();
+
+                // adjust the header padding
+                self._fixHeaderPadding(self.virtualizedContainer.wrapper.parent());
+            }
+            else {
+                // adjust the header padding
+                self._fixHeaderPadding(contentWrapper);
+
                 // Fix for space under last row when there is only vertical scroll.
-                if (isIE && !isIE7 && !isIE8) {
-                    var el = contentWrapper.get(0);
-                    if (el.scrollWidth <= el.clientWidth) {
-                        contentWrapper.css(HEIGHT, wrapperHeight + 1);
-                    }
+                if (!autoHeight && isIE && !isIE7 && !isIE8 && !support.hasScrollbarX(contentWrapper)) {
+                    contentWrapper.css(HEIGHT, wrapperHeight + 1);
                 }
             }
+        },
+
+        _fixHeaderPadding: function(scrollable) {
+            var self = this,
+                isRtl = support.isRtl(self.element),
+                headerWrapper = self.headerWrapper,
+                scrollableEl = $(scrollable).get(0);
+
+            if (!scrollableEl) {
+                // WARNING: this happening in virtualized mode
+                return;
+            }
+
+            // add any header padding if vertical scrollbar
+            // WARNING: cannot use support.hasScrollbarY because of a bug in FF (it does not add a 
+            // scrollbar when scrollHeight - clientHeight = 1 !!!
+
+            if (scrollableEl.scrollHeight - scrollableEl.clientHeight > 1) {
+                headerWrapper.parent().css(isRtl ? "padding-left" : "padding-right", support.scrollbar() - 1);
+                headerWrapper.removeClass("sui-no-y-scroll");
+            }
+            else {
+                headerWrapper.parent().css(isRtl ? "padding-left" : "padding-right", 0);
+                headerWrapper.addClass("sui-no-y-scroll");
+            }
+        },
+
+        _ensureVirtualizedContainer: function() {
+            var self = this,
+                row,
+                rowHeight;
+
+            // return if already initialized
+            if (self.virtualizedContainer) {
+                return;
+            }
+
+            // construct and append the first row to the table body, 
+            // so that we can take its height, and finally remove it;
+            // NOTE: use an undefined data item so that the first row is comprised of a single line
+            row = self._renderRow(0, self.contentTable.tbody, {});
+            rowHeight = row.outerHeight();
+            row.remove();
+
+            // construct the virtualized container object
+            self.virtualizedContainer = new shield.ui.VirtualizedContainer(self.scrollableWrapper, {
+                itemHeight: rowHeight,
+                total: self.dataSource.total,
+                createContainer: function (wrapper) {
+                    return wrapper
+                        .addClass("sui-content")
+                        .append(self.contentTable)
+                        .find("tbody")
+                        .empty();
+                },
+                getItems: proxy(self._loadVirtualRows, self),
+                // do not call render in the constructor, 
+                // we need to delay it in order to access the virtualizedContainer instance
+                // from the getItems handler
+                skipRender: true
+            });
+
+            self.contentWrapper = self.virtualizedContainer.element.children().eq(0);
         },
 
         _loadVirtualRows: function (start, end, done) {
@@ -3779,68 +4349,81 @@
                 dataSource = self.dataSource,
                 skip = dataSource.skip != null ? dataSource.skip : 0,
                 take = dataSource.take != null ? dataSource.take : dataSource.view.length,
-                i,
                 wait = 100,
                 virtualizedContainerElement = self.virtualizedContainer.container;
-            
-            if (!self._sortingInProgress && dataSource.remote && (start < skip || end > (skip + take))) {
-                clearTimeout(self._loadWaitTimeout);
 
-                self._loadWaitTimeout = setTimeout((function (start, end, done) {
-                    return function () {
-                        self._loadWaitTimeout = null;
+            if (start < end) {
+                // there are items to render
 
-                        dataSource.skip = start;
-                        dataSource.take = end - start;
+                // NOTE: the last group of conditions is tricky (changed last comparison from > to >= due to a bug)
+                if (!self._sortingInProgress && dataSource.remote && (start < skip || end >= (skip + take))) {
+                    clearTimeout(self._loadWaitTimeout);
 
-                        self._loadingVirtualRows = true;
+                    self._loadWaitTimeout = setTimeout((function (start, end, done) {
+                        return function () {
+                            self._loadWaitTimeout = null;
 
-                        dataSource.read().then(function () {
-                            if (self._loadWaitTimeout) {
-                                // another timeout callback was registered
-                                return;
-                            }
+                            dataSource.skip = start;
+                            dataSource.take = end - start;
 
-                            // in order to make code render cells first, we are doing what the VirtualizedContainer._renderItems() does
-                            // and passing params to it not to do anything but just call the done() handler
-                            virtualizedContainerElement.empty();
-
-                            for (i = start; i < end && i < dataSource.total; i++) {
-                                var dataItem = self.dataSource.view[i - start];
-                                self._renderRow(i - start, virtualizedContainerElement, dataItem);
-                            }
+                            self._loadingVirtualRows = true;
 
                             // as widget-level events fire after the promise callbacks, and as we need the value 
                             // of _loadingVirtualRows in the widget-level CHANGE handler (_renderData), we register
                             // a one-time CHANGE event handler that will clear the property AFTER _renderData
-                            dataSource.one(CHANGE, function () {
+                            dataSource.one(CHANGE + ".shieldGrid" + self.getInstanceId(), function () {
                                 if (!self._loadWaitTimeout) {
                                     self._loadingVirtualRows = false;
                                 }
                             });
 
-                            self.loading(false);
+                            dataSource.read().then(function () {
+                                if (self._loadWaitTimeout) {
+                                    // another timeout callback was registered
+                                    return;
+                                }
 
-                            done([], false);
-                        });
+                                // in order to make code render cells first, we are doing what the VirtualizedContainer._renderItems() does
+                                // and passing params to it not to do anything but just call the done() handler
+                                virtualizedContainerElement.empty();
+
+                                for (var i = start; i < end && i < dataSource.total; i++) {
+                                    self._renderRow(i - start, virtualizedContainerElement, dataSource.view[i - start]);
+                                }
+
+                                self.loading(false);
+
+                                done([], false);
+
+                                self.trigger(VIRTUAL_ROWS_LOADED);
+                            });
+                        }
+                    })(start, end, done), wait);
+                }
+                else {
+                    // in order to make code render cells first, we are doing what the VirtualizedContainer._renderItems() does
+                    // and passing params to it not to do anything but just call the done() handler
+                    virtualizedContainerElement.empty();
+
+                    for (var i = start; i < end && i < dataSource.total; i++) {
+                        self._renderRow(i, virtualizedContainerElement, dataSource.view[i]);
                     }
-                })(start, end, done), wait);
+
+                    done([], false);
+
+                    self.trigger(VIRTUAL_ROWS_LOADED);
+                }
             }
             else {
-                // in order to make code render cells first, we are doing what the VirtualizedContainer._renderItems() does
-                // and passing params to it not to do anything but just call the done() handler
-                virtualizedContainerElement.empty();
-
-                for (i = start; i < end && i < dataSource.total; i++) {
-                    var dataItem = self.dataSource.view[i];
-                    self._renderRow(i, virtualizedContainerElement, dataItem);
-                }
-
-                done([], false);
+                // no items to render
+                self._renderNoRecords();
             }
 
             // Check if the vertical scroll is shown and remove the top right gap if the scroll is hidden.
             self._checkIfVerticalScroll();
+
+            // reinitialize selection
+            self._initSelection();
         },
 
         _checkIfVerticalScroll: function () {
@@ -3859,22 +4442,38 @@
             }
         },
 
-        _hscroll: function (e) {
+        _onscroll: function (e) {
             var self = this,
                 scrollableWrapper = self.scrollableWrapper,
                 scrollableElement = scrollableWrapper.get(0),
                 headerWrapper = self.headerWrapper,
                 contentScrollLeft = scrollableWrapper.scrollLeft(),
-                headerScrollLeft = headerWrapper.scrollLeft();
+                headerScrollLeft = headerWrapper.scrollLeft(),
+                footer;
 
             // Bug in Chrome: https://code.google.com/p/chromium/issues/detail?id=81344
-            if (support.isRtl(self.element) &&
-                isWebKit && scrollableElement.clientHeight < scrollableElement.scrollHeight) {
+            if (support.isRtl(self.element) && isWebKit && scrollableElement.clientHeight < scrollableElement.scrollHeight) {
                 contentScrollLeft = contentScrollLeft + (scrollableElement.offsetWidth - scrollableElement.clientWidth);
             }
 
             if (contentScrollLeft != headerScrollLeft) {
                 headerWrapper.scrollLeft(contentScrollLeft);
+
+                if (self._footer) {
+                    footer = $(self._footer).find(".sui-footer-content");
+                    if (footer.length > 0) {
+                        footer.scrollLeft(contentScrollLeft);
+                    }
+                }
+            }
+
+            if (self.frozenHeaderWrapper) {
+                var contentScrollTop = scrollableWrapper.scrollTop(),
+                    frozenScrollTop = self.frozenContentWrapper.scrollTop();
+
+                if (contentScrollTop != frozenScrollTop) {
+                    self.frozenContentWrapper.scrollTop(contentScrollTop);
+                }
             }
         },
 
@@ -3884,6 +4483,9 @@
                 element = self.element;
 
             if (sorting && self.columns.length) {
+                if (self.sorting) {
+                    self.sorting.destroy();
+                }
                 self.sorting = new Sorting(sorting, self);
             }
         },
@@ -3904,44 +4506,70 @@
                 return;
             }
 
-            evt = self.trigger(COMMAND, {commandName: DATABOUND, cancel: false});
+            evt = self.trigger(COMMAND, { commandName: DATABOUND, cancel: false });
             if (evt.cancel) {
                 return;
             }
-
-            if (self._sortingInProgress) {
-                self._updateGrid();
-            }
-            else {
-                if (!self.columns.length) {
-                    fields = [];
-
-                    if (data.length) {
-                        each(data[0], function (i, n) {
-                            fields.push(i);
-                        });
-                    }
-
-                    options.columns = fields;
-                    self._resolveColumns(fields);
-                    self._createThead(self.headerTable, true);
-                }
-
-                self._createColgroup(self.headerTable);
-            }
-
-            self._createColgroup(self.contentTable);
 
             // this function is called on a DS.change event, so we can assume sorting is done 
             // so set _sortingInProgress to FALSE in order for the _renderRows() function
             // to work properly in both virtualized and normal mode
             self._sortingInProgress = false;
 
+            // initialize the columns if not initialized
+            if (!self.columns.length) {
+                fields = [];
+
+                if (data.length) {
+                    each(data[0], function (i, n) {
+                        fields.push(i);
+                    });
+                }
+
+                options.columns = fields;
+                self._resolveColumns(fields);
+            }
+
+            // reinitialize filtering
+            self._filtering();
+
+            // destroy the frozen containers
+            self._destroyFrozenContainers();
+
+            // recreate the thead of the header table;
+            // the content table does not have a thead
+            self._createThead(self.headerTable);
+
+            // reinitialize colgroups
+            self._createColgroup(self.headerTable);
+            self._createColgroup(self.contentTable);
+
+            // empty the content table rows
+            self.contentTable.tbody.empty();
+
+            // reinitialize sorting
+            self._sorting();
+
+            // render all rows
             self._renderRows();
+
+            // render the footer
             self._renderFooter();
 
             
 
+            // ensure the visibility of columns
+            self._refreshColVisibility();
+
+            // initialize frozen columns if there is any data
+            if (data && data.length > 0) {
+                self._initFrozenCols();
+            }
+
+            // reinitialize selection
+            self._initSelection();
+
+            // turn off the loading panel
             self.loading(false);
 
             
@@ -3958,11 +4586,17 @@
                 data = dataSource.view,
                 i,
                 groups,
-                contentTable = self.contentTable;
+                key,
+                count,
+                headerTableColgroup,
+                contentTableColgroup,
+                headerTableThead,
+                filteringEnabled = options.filtering && options.filtering.enabled,
+                filterRow;
 
             // used in editing to keep all updated cells indexes. Used when markers are rendered into each cell.
             if (self._markedCells) {
-                for (var key in self._markedCells) {
+                for (key in self._markedCells) {
                     if (self._markedCells.hasOwnProperty(key)) {
                         self._markedCells[key].length = 0;
                     }
@@ -3970,15 +4604,10 @@
                 self._markedCells = null;
             }
 
-            contentTable.tbody.empty();
-
             if (!data || !data.length) {
-                if (isUndefined(options.noRecordsTemplate)) {
-                    $("<tr><td colspan='" + self.columns.length + "'>" + (options.noRecordsText || "No records to display") + "</td></tr>").appendTo(contentTable.tbody);
-                }
-                else {
-                    $("<td></td>").append(options.noRecordsTemplate).wrap("<tr></tr>").parent().appendTo(contentTable.tbody);
-                }
+                self._renderNoRecords();
+
+                self._initScrolling();
 
                 return;
             }
@@ -3988,18 +4617,35 @@
                 groups = dataSource.group;
 
                 if (groups && groups.length > 0) {
-                    var count = 0;
+                    count = 0;
+
                     self._renderGroupedData(data, count, 0);
-                    self.headerTable.find(">colgroup").find(".sui-indent-col").remove();
-                    self.headerTable.thead.find(".sui-columnheader > .sui-indent-cell").remove();
-                    for (i = 0; i < groups.length; i++) {
 
-                        $("<col class='sui-indent-col'/>").prependTo(self.headerTable.find(">colgroup"));
-                        $("<col class='sui-indent-col'/>").prependTo(self.contentTable.find(">colgroup"));
+                    headerTableColgroup = self.headerTable.find(">colgroup").first();
+                    contentTableColgroup = self.contentTable.find(">colgroup").first();
+                    headerTableThead = self.headerTable.thead.find(".sui-columnheader").first();
 
-                        $("<th class='sui-indent-cell'/>").prependTo(self.headerTable.thead.find(".sui-columnheader"));
+                    if (filteringEnabled) {
+                        filterRow = self.headerTable.find(".sui-filter-row").first();
                     }
-                    self._addAllIntendCells();
+
+                    headerTableColgroup.find(".sui-indent-col").remove();
+                    headerTableThead.find(".sui-columnheader > .sui-indent-cell").remove();
+                    if (filterRow && filterRow.length > 0) {
+                        filterRow.find(".sui-indent-cell").remove();
+                    }
+
+                    for (i = 0; i < groups.length; i++) {
+                        $('<col class="sui-indent-col"/>').prependTo(headerTableColgroup);
+                        $('<th class="sui-indent-cell"/>').prependTo(headerTableThead);
+                        if (filterRow && filterRow.length > 0) {
+                            $('<th class="sui-indent-cell"/>').prependTo(filterRow);
+                        }
+
+                        $('<col class="sui-indent-col"/>').prependTo(contentTableColgroup);
+                    }
+
+                    self._addAllIndentCells();
                     self.contentTable.addClass("sui-grouped-table");
                 }
                 else {
@@ -4009,19 +4655,60 @@
 
             self._createGroupPanel();
 
-            if (options.scrolling && !self._sortingInProgress) {
+            self._initScrolling();
+        },
+
+        _getVisibleColumnCount: function() {
+            var columns = this.columns || [],
+                colLen = columns.length,
+                i,
+                count = 0;
+
+            for (i=0; i<colLen; i++) {
+                if (columns[i].visible) {
+                    count++;
+                }
+            }
+
+            return count;
+        },
+
+        _renderNoRecords: function() {
+            var self = this,
+                options = self.options,
+                contentTable = self.contentTable;
+
+            if (isUndefined(options.noRecordsTemplate)) {
+                $('<tr><td class="sui-grid-norecords-cell" colspan="' + self._getVisibleColumnCount() + '" role="gridcell">' + (options.noRecordsText || "No records to display") + '</td></tr>').appendTo(contentTable.tbody);
+            }
+            else {
+                $('<td class="sui-grid-norecords-cell" colspan="' + self._getVisibleColumnCount() + '" role="gridcell"/>').append(options.noRecordsTemplate).wrap('<tr/>').parent().appendTo(contentTable.tbody);
+            }
+        },
+
+        _initScrolling: function () {
+            var self = this;
+
+            if (self.options.scrolling && !self._sortingInProgress) {
                 self._scrolling();
             }
         },
 
-        _addAllIntendCells: function () {
-            var self = this,
-                j,
-                rows = self.contentTable.get(0).rows;
+        _initSelection: function() {
+            this._selection();
+        },
 
-            for (var i = 0; i < rows.length; i++) {
-                var row = $(rows[i]);
-                var groupLevel = parseInt(row.attr("data-group-level"), 10);
+        _addAllIndentCells: function () {
+            var self = this,
+                rows = self.contentTable.get(0).rows,
+                i,
+                j,
+                row,
+                groupLevel;
+
+            for (i = 0; i < rows.length; i++) {
+                row = $(rows[i]);
+                groupLevel = parseInt(row.attr("data-group-level"), 10);
 
                 if (row.hasClass("sui-group-header")) {
                     if (groupLevel > 1) {
@@ -4039,14 +4726,17 @@
         },
 
         _renderGroupedData: function (data, count, level) {
-            var self = this;
+            var self = this,
+                i,
+                item;
 
             // if the row has detail template it needs to be expanded by default and it needs to be non collapsible(otherwise the expand/collapse will conflict with groups expand collapse)
             self.options.detailExpandCollapse = false;
-            for (var i = 0; i < data.length; i++) {
-                var item = data[i];
 
-                if (item.hasOwnProperty("field") && item.hasOwnProperty("items") && item.hasOwnProperty("value") && item.hasOwnProperty("order")) {
+            for (i = 0; i < data.length; i++) {
+                item = data[i];
+
+                if (item.hasOwnProperty("field") && item.hasOwnProperty("items") && item.hasOwnProperty("value")) {
                     level++;
                     self._renderGroupHeader(item, level);
                     self._renderGroupedData(item.items, count, level);
@@ -4063,15 +4753,15 @@
         _renderGroupAggregates: function (item) {
             if (item.aggregate) {
                 var self = this,
-                columns = self.columns,
-                footerRow,
-                groupFooterTemplate,
-                dataItem = {},
-                field,
-                isNull = is["null"],
-                i,
-                aggregates = item.aggregate,
-                cell;
+                    columns = self.columns,
+                    footerRow,
+                    groupFooterTemplate,
+                    dataItem = {},
+                    field,
+                    i,
+                    aggregates = item.aggregate,
+                    cell;
+
                 for (i = 0; i < columns.length; i++) {
                     groupFooterTemplate = columns[i].groupFooterTemplate;
                     if (groupFooterTemplate) {
@@ -4079,6 +4769,7 @@
                         break;
                     }
                 }
+
                 if (footerRow) {
                     for (i = 0; i < columns.length; i++) {
                         cell = $("<td class='sui-group-footer-cell' />").appendTo(footerRow);
@@ -4118,15 +4809,15 @@
 
         _renderGroupHeader: function (item, level) {
             var self = this,
-               contentTable = self.contentTable;
+                contentTable = self.contentTable,
+                colspan = self._getVisibleColumnCount() + self.dataSource.group.length - level + 1,
+                groupRow = $('<tr class="sui-group-header" data-group-level="' + level + '"/>').appendTo(contentTable),
+                groupCell = $('<td class="sui-group-header-cell" colspan="' + colspan + '"/>').appendTo(groupRow),
+                expandCollapseSpan = $('<span class="sui-collapse">&#9662;</span>').appendTo(groupCell);
 
-            var colspan = self.columns.length + self.dataSource.group.length - level + 1;
-            var groupRow = $("<tr class='sui-group-header' data-group-level='" + level + "' />").appendTo(contentTable);
-            var groupCell = $("<td class='sui-group-header-cell' colspan='" + colspan + "' />").appendTo(groupRow);
-            var expandCollapseSpan = $("<span class='sui-collapse'>&#9662;</span>").appendTo(groupCell);
-            $("<span class='sui-group-header-text'>" + item.field + ": " + item.value + "</span>").appendTo(groupCell);
+            $('<span class="sui-group-header-text">' + item.field + ": " + item.value + "</span>").appendTo(groupCell);
 
-            expandCollapseSpan.on(CLICK, self._expandCollapse = proxy(self._expandCollapseHandler, self));
+            expandCollapseSpan.on(CLICK, proxy(self._expandCollapseHandler, self));
         },
 
         _expandCollapseHandler: function (e) {
@@ -4159,7 +4850,8 @@
             var self = this,
                contentTable = self.contentTable;
 
-            self._renderRow(index, contentTable, item).attr("data-group-level", level);
+            self._renderRow(index, contentTable, item)
+                .attr("data-group-level", level);
         },
 
         _renderRowsAndDetails: function (data) {
@@ -4169,9 +4861,8 @@
                 i;
 
             for (i = 0, len = data.length; i < len; i++) {
-                var dataItem = self.dataSource.view[i];
                 // render a row and append it to the table body
-                self._renderRow(i, contentTable.tbody, dataItem);
+                self._renderRow(i, contentTable.tbody, self.dataSource.view[i]);
 
                 if (self._hasDetailTemplate() && !self._canExpandCollapse()) {
                     self._addDetailTemplate(data[i]);
@@ -4184,7 +4875,6 @@
         _renderRow: function (index, target, dataItem) {
             var self = this,
                 targetDefined = isDefined(target),
-                isNull = is["null"],
                 options = self.options,
                 altRows = isUndefined(options.altRows) ? true : options.altRows,
                 rowTemplate = altRows && (index % 2) && options.altRowTemplate ? options.altRowTemplate : options.rowTemplate,
@@ -4209,7 +4899,8 @@
                 }
             }
             else {
-                row = $("<tr class='" + ((altRows && (index % 2)) ? "sui-alt-row" : "sui-row") + "'/>");
+                row = $('<tr class="' + ((altRows && (index % 2)) ? "sui-alt-row" : "sui-row") + '"/>')
+                    .data(SUI_VIEWINDEX, index);
 
                 if (arguments.length > 3) {
                     // in edit mode we pass additional parameter which is the row index
@@ -4237,12 +4928,22 @@
                         columnField = column.field,
                         buttons = column.buttons,
                         value,
-                        cell = $("<td " + normalizeAttributes(column.attributes) + " class='sui-cell' />").appendTo(row),
+                        cell = $('<td ' + normalizeAttributes(column.attributes) + ' role="gridcell" tabindex="-1"/>')
+                            .addClass('sui-cell')
+                            .appendTo(row),
                         z;
+
+                    // ARIA
+                    cell
+                        .attr(ROLE, "gridcell")
+                        .attr(TABINDEX, "-1");
+                    if (!column.editable) {
+                        cell.attr(ARIA_READONLY, TRUE);
+                    }
 
                     if (buttons) {
                         for (z = 0; z < buttons.length; z++) {
-                            self._buildButton(buttons[z], cell, row.get(0).rowIndex);
+                            self._buildButton(buttons[z], cell, index);
                         }
                     }
                     else if (columnTemplate) {
@@ -4269,6 +4970,10 @@
                     else {
                         cell.html("" + get(dataItem, columnField));
                     }
+
+                    if (!column.visible) {
+                        cell.css(DISPLAY, NONE);
+                    }
                 }
             }
 
@@ -4276,44 +4981,84 @@
             if (self._hasDetailTemplate() && self._canExpandCollapse()) {
                 args = self.trigger(COMMAND, { commandName: EXPANDBUTTONCREATE, cancel: false, item: dataItem });
                 if (!args.cancel) {
-                    expandCell = $("<td class='sui-cell sui-expand-cell' />");
+                    expandCell = $('<td class="sui-cell sui-expand-cell"/>');
                     self._setExpandCollapseCellText(expandCell, options.detailExpandText, options.detailCollapseText);
                 }
                 else {
-                    expandCell = $("<td class='sui-cell sui-expand-cell-disabled' />");
+                    expandCell = $('<td class="sui-cell sui-expand-cell-disabled"/>');
                 }
                 expandCell.prependTo(row);
             }
+
+            // ARIA
+            row.attr(ROLE, "row");
 
             return row;
         },
 
         _renderFooter: function () {
             var self = this,
+                options = self.options,
                 columns = self.columns,
+                footerContainer,
                 footerRow,
                 footerTemplate,
                 dataItem = {},
                 field,
                 i,
-                isNull = is["null"],
+                j,
                 aggregates = self.dataSource.aggregates,
                 cell;
+
+            // remove any previously saved footer container
+            if (self._footer) {
+                $(self._footer).remove();
+                self._footer = null;
+            }
+
             for (i = 0; i < columns.length; i++) {
                 footerTemplate = columns[i].footerTemplate;
+
                 if (footerTemplate) {
-                    footerRow = $("<tr class='sui-grid-footer' />").appendTo(self.contentTable.tbody);
+                    if (options.scrolling && options.scrolling.virtual) {
+                        var footerDiv = $('<div class="sui-footer" style="padding-right:16px;"/>').appendTo(self.element),
+                            footerDivContent = $('<div class="sui-footer-content"/>').appendTo(footerDiv),
+                            table = $('<table class="sui-table"/>').appendTo(footerDivContent),
+                            parentColgroup = self.element.find(".sui-headercontent > table > colgroup > col"),
+                            childColgroup = $("<colgroup/>").appendTo(table);
+
+                        for (j = 0; j < parentColgroup.length; j++) {
+                            $(parentColgroup[j].outerHTML).appendTo(childColgroup);
+                        }
+
+                        footerContainer = $("<tbody/>").appendTo(table);
+
+                        // save the footer container to be removed later
+                        self._footer = footerDiv;
+                    }
+                    else {
+                        footerContainer = $("<tfoot/>").appendTo(self.contentTable);
+
+                        // save the footer container to be removed later
+                        self._footer = footerContainer;
+                    }
+
+                    footerRow = $('<tr class="sui-grid-footer"/>').appendTo(footerContainer);
+
                     break;
                 }
             }
 
             if (footerRow) {
                 for (i = 0; i < columns.length; i++) {
-                    cell = $("<td class='sui-footer-cell' />").appendTo(footerRow);
+                    cell = $('<td class="sui-footer-cell" role="gridcell" tabindex="-1"/>')
+                        .appendTo(footerRow);
+
                     footerTemplate = columns[i].footerTemplate;
+
                     if (footerTemplate) {
                         field = columns[i].field;
-                        for (var j = 0; j < aggregates.length; j++) {
+                        for (j = 0; j < aggregates.length; j++) {
                             if (aggregates[j].field == field) {
                                 if (isFunc(aggregates[j].aggregate)) {
                                     dataItem.custom = aggregates[j].value;
@@ -4342,7 +5087,7 @@
                     previousRow.find(".sui-indent-cell").length > 0 ||
                     previousRow.find(".sui-collapse-cell").length > 0) {
 
-                    footerRow.prepend($("<td />"));
+                    footerRow.prepend($("<td/>"));
                 }
             }
         },
@@ -4354,10 +5099,11 @@
                 btn;
 
             if (shield.ui.Button) {
-                var wrapperButton = $("<button type='button'>" + buttonOptions.caption + "</button>")
+                var wrapperButton = $('<button type="button">' + buttonOptions.caption + '</button>')
                     .appendTo(cell);
 
-                cell.addClass("sui-button-cell")
+                cell.addClass("sui-button-cell");
+
                 // override the command handler if a commandName is set
                 if (commandName === "delete") {
                     commandHandler = self._deleteButtonClicked;
@@ -4404,10 +5150,11 @@
         _deleteButtonClicked: function (index, cell) {
             var self = this,
                 ds = self.dataSource,
-                confirm = self.options.editing ? self.options.editing.confirmation : null,
-                args = self.trigger(COMMAND, { commandName: DELETE, cancel: false, rowIndex: index });//,
-            //pager = self.pager,
-            //deleteItemIndex = pager ? pager.pageSize() * (pager.currentPage - 1) + index : index;
+                editingOptions = self.options.editing,
+                confirm = editingOptions ? editingOptions.confirmation : null,
+                args;
+
+            args = self.trigger(COMMAND, { commandName: DELETE, cancel: false, rowIndex: index });
 
             if (!args.cancel) {
                 if (confirm && confirm["delete"] && confirm["delete"].enabled) {
@@ -4418,10 +5165,11 @@
 
                 // if here - confirm was ok or no confirmation was needed
                 ds.removeAtView(index);
-                if (self.options.editing && !self.options.editing.batch) {
+                if (editingOptions && !editingOptions.batch) {
                     // call save, passing false to suppress triggering the change event
                     ds.save(false);
                 }
+
                 self.trigger(DELETE, { rowIndex: index });
             }
         },
@@ -4431,27 +5179,139 @@
             var self = this,
                 editing = self._editing,
                 ds = self.dataSource,
-                buttons = null,
-                args = self.trigger(COMMAND, { commandName: EDIT, cancel: false, row: $(cell).parent(), cell: cell });
-
-            self._editingInProcess = true;
+                row = $(cell).parent(),
+                args = self.trigger(COMMAND, { commandName: EDIT, cancel: false, row: row, cell: cell, index: self._getRowIndex(row) });
 
             if (!args.cancel) {
+                self._editingInProcess = true;
+
                 if (ds.tracker && ds.tracker.changes && ds.tracker.changes.added && ds.tracker.changes.added.length > 0) {
                     ds.cancel();
                 }
                 else {
-                    self._closeAllEditedRows();
+                    if (self.options.editing.mode != "popup") {
+                        self._closeAllEditedRows();
 
-                    if (editing && editing.options.enabled) {
-                        self._editing._putRowInEditMode($(self.contentTable.find("tbody > tr")[index]));
+                        if (editing && editing.options.enabled) {
+                            editing._putRowInEditMode(row);
+                        }
+
+                        self._changeEditColumnButtons(index, cell);
                     }
-
-                    self._changeEditColumnButtons(index, cell);
+                    else {
+                        // Popup editing
+                        if (shield.ui.Window) {
+                            self._initializePopupForm(index);
+                        }
+                    }
                 }
 
-                self.trigger(EDIT, { row: $(cell).parent(), cell: cell });
+                self.trigger(EDIT, { row: $(cell).parent(), cell: cell, index: self._getRowIndex($(cell).parent()) });
             }
+        },
+
+        _initializePopupForm: function (index, isInserting) {
+            var self = this,
+                editing = self._editing,
+                ds = self.dataSource,
+                wrapperWindow,
+                editFormContainer,
+                columns,
+                i,
+                col;
+
+            wrapperWindow = $('<div class="sui-modal-popup-edit-window"/>')
+                .appendTo(doc.body);
+
+            editFormContainer = $('<div class="sui-edit-form-container"/>');
+            columns = self.options.columns;
+
+            for (i = 0; i < columns.length; i++) {
+                col = columns[i];
+
+                if (col.editable === false) {
+                    continue;
+                }
+
+                if (col.field) {
+                    var columnType = isDefined(ds.schema.options.fields) ? ds.schema.options.fields[col.field].type : String,
+                        dataItem = ds.editView(index).data,
+                        value = get(dataItem, col.field);
+
+                    self._windowEditingIndex = index;
+
+                    $('<div class="sui-edit-form-label"><label for="' + col.field + '">' + (col.caption ? col.caption : col.field) + '</label></div>')
+                        .appendTo(editFormContainer);
+
+                    var editFieldDiv = $('<div class="sui-edit-field"></div>')
+                        .appendTo(editFormContainer);
+
+                    if (col.editor) {
+                        editing._instantiateCustomEditor(col, editFieldDiv, dataItem, 0, false, col.field);
+                    }
+                    else {
+                        switch (columnType) {
+                            case Number:
+                                editing._instantiateNumeric(editFieldDiv, value, false, col.field);
+                                break;
+                            case Date:
+                                editing._instantiateDatePicker(editFieldDiv, value, false, col.field);
+                                break;
+                            case String:
+                                editing._instantiateTextBox(editFieldDiv, value, false, col.field);
+                                break;
+                            case Boolean:
+                                editing._instantiateCheckBox(editFieldDiv, value, false, col.field);
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                }
+            }
+
+            var editFieldButtons = $('<div class="sui-update-buttons sui-popup-buttons"></div>').appendTo(editFormContainer),
+                wrapperButtonSave = $("<button type='button'>Save</button>").appendTo(editFieldButtons),
+                wrapperButtonCancel = $("<button type='button'>Cancel</button>").appendTo(editFieldButtons);
+
+            if (shield.ui.Button) {
+                var btnSave = new shield.ui.Button(wrapperButtonSave, {
+                    events: {
+                        click: proxy(self._updateButtonClicked, self)
+                    }
+                });
+
+                var btnCancel = new shield.ui.Button(wrapperButtonCancel, {
+                    events: {
+                        click: proxy(self._cancelButtonClicked, self)
+                    }
+                });
+
+                self._buttons = [];
+                self._buttons.push({ index: 10000, button: btnSave });
+                self._buttons.push({ index: 10000, button: btnCancel });
+            }
+
+            editFormContainer.appendTo(doc.body);
+
+            // build the window with the given options
+            self.popupWindow = new shield.ui.Window(wrapperWindow, {
+                title: isInserting ? "Insert" : "Edit",
+                draggable: {
+                    enabled: false
+                },
+                events: {
+                    close: proxy(self._cancelButtonClicked, self)
+                },
+                height: $(".sui-edit-form-container").height() + 57,
+                modal: true
+            });
+
+            self.popupWindow.content(editFormContainer);
+
+            self.popupWindow.resize({ width: $(".sui-modal-popup-edit-window").width(), height: $(".sui-edit-form-container").height() + 66 });
+
+            self.trigger(isInserting ? INSERTWINDOWOPEN : EDITWINDOWOPEN);
         },
 
         _changeEditColumnButtons: function (index, cell) {
@@ -4460,10 +5320,10 @@
             self._removeButtons(cell, index);
 
             // create update button
-            self._buildButton({ caption: "Update", click: self._updateButtonClicked }, cell, index);
+            self._buildButton({ caption: "Update", click: self._updateButtonClicked, cls: "sui-update" }, cell, index);
 
             // create cancel button
-            self._buildButton({ caption: "Cancel", click: self._cancelButtonClicked }, cell, index);
+            self._buildButton({ caption: "Cancel", click: self._cancelButtonClicked, cls: "sui-cancel" }, cell, index);
 
             cell.addClass("sui-update-buttons");
         },
@@ -4486,8 +5346,11 @@
 
         // handle the click event of update button
         _updateButtonClicked: function (index, cell) {
-            var self = this,
-                ds = self.dataSource;
+            var self = this;
+
+            if (!isUndefined(self._windowEditingIndex)) {
+                index = self._windowEditingIndex;
+            }
 
             self._updateItem(index, cell);
 
@@ -4497,6 +5360,10 @@
             }
 
             self._putRowInViewMode(index, cell);
+
+            if (self.options.editing.mode === "popup") {
+                self._removePopupWindow();
+            }
         },
 
         _updateItem: function (index, cell) {
@@ -4508,12 +5375,15 @@
                 value,
                 populateInsertedItem = true,
                 args,
-                key;
+                key,
+                rows,
+                row,
+                i;
 
-            if (ds.group && ds.group.length > 0) {
-                var rows = self.contentTable.find(".sui-row, .sui-alt-row");
-                var row = self.contentTable.find("tr").get(index);
-                for (var i = 0; i < rows.length; i++) {
+            if (ds.group && ds.group.length > 0 && self.options.editing.mode != "popup") {
+                rows = self.contentTable.find(".sui-row, .sui-alt-row");
+                row = self.contentTable.find("tr").get(index);
+                for (i = 0; i < rows.length; i++) {
                     if (rows[i] == row) {
                         index = i;
                         break;
@@ -4576,33 +5446,22 @@
         _getDefaultValue: function (field) {
             var self = this,
                 schema = self.dataSource.schema,
-                value;
+                fields;
 
             if (schema && schema.options.fields) {
-                switch (schema.options.fields[field].type) {
-                    case Number:
-                        value = 0;
-                        break;
-                    case Date:
-                        value = new Date();
-                        break;
-                    case String:
-                        value = "";
-                        break;
-                    case Boolean:
-                        value = false;
-                        break;
-                    default:
-                }
-            }
-            else {
-                value = "";
+                fields = schema.options.fields;
+
+                return shield.Model.def(
+                    get(fields, field + ".type"),
+                    get(fields, field + ".def"),
+                    get(fields, field + ".nullable")
+                );
             }
 
-            return value;
+            return "";
         },
 
-        _closeAllEditedRows: function (allUpdatedCellsKyes) {
+        _closeAllEditedRows: function () {
             var self = this,
                 rowIndex,
                 cell,
@@ -4612,11 +5471,6 @@
                 rowIndex = editableCells.get(0).parentNode.rowIndex;
                 cell = self.contentTable.find(".sui-update-buttons").get(0);
                 self._cancelButtonClicked(rowIndex, $(cell));
-
-                // batch update with updated cells
-                if (allUpdatedCellsKyes && allUpdatedCellsKyes.length > 0) {
-                    self._renderUpdateMarkers(allUpdatedCellsKyes, rowIndex);
-                }
             }
         },
 
@@ -4624,33 +5478,74 @@
         _cancelButtonClicked: function (index, cell) {
             var self = this,
                 dataSource = self.dataSource,
-                args = self.trigger(COMMAND, { commandName: CANCEL, cancel: false, rowIndex: index, cell: cell });
+                args = self.trigger(COMMAND, { commandName: CANCEL, cancel: false, rowIndex: index, cell: cell }),
+                columns,
+                i,
+                colEditor;
 
             if (!args.cancel) {
                 if (dataSource.tracker && dataSource.tracker.changes && dataSource.tracker.changes.added && dataSource.tracker.changes.added.length > 0) {
                     dataSource.cancel();
+                    if (self.options.editing.mode === "popup") {
+                        self._removePopupWindow();
+                    }
                 }
                 else {
-                    self._putRowInViewMode(index, cell);
+                    if (self.options.editing.mode != "popup") {
+                        self._putRowInViewMode(index, cell);
+                    }
+                    else {
+                        columns = self.options.columns;
+                        for (i = 0; i < columns.length; i++) {
+                            colEditor = self._editing._editors[columns[i].field];
+                            if (colEditor) {
+                                if (isFunc(colEditor.destroy)) {
+                                    self._editing._editors[columns[i].field].destroy();
+                                }
+                                delete self._editing._editors[columns[i].field];
+                            }
+                        }
+
+                        self._removePopupWindow();
+                    }
                 }
 
                 self.trigger(CANCEL);
             }
         },
 
+        _removePopupWindow: function () {
+            var self = this;
+
+            self._removeButtons($(".sui-window .sui-update-buttons"), 10000);
+
+            self.popupWindow.destroy();
+
+            $(".sui-modal-popup-edit-window").remove();
+        },
+
+        // returns the view index of the passed row; if not an item row, returns -1
+        _getRowIndex: function(row) {
+            var viewIndex = $(row).data(SUI_VIEWINDEX);
+            return isDefined(viewIndex) ? viewIndex : -1;
+        },
+
         _putRowInViewMode: function (index, cell) {
             var self = this,
+                options = self.options,
+                navigation = options.navigation,
                 dataItem,
                 row,
                 rows,
                 i,
                 ds = self.dataSource,
                 contentTable = self.contentTable,
-                dataItemIndex = index;
+                dataItemIndex = index,
+                activeCellIndex = -1;
 
-            if (ds.group && ds.group.length > 0) {
-                rows = contentTable.find(".sui-row, .sui-alt-row");
-                row = contentTable.find("tr").get(index);
+            if (ds.group && ds.group.length > 0 && options.editing.mode != "popup") {
+                rows = contentTable.find(">tbody > tr.sui-row, >tbody > tr.sui-alt-row");
+                row = contentTable.find(">tbody > tr").get(index);
                 for (i = 0; i < rows.length; i++) {
                     if (rows[i] == row) {
                         dataItemIndex = i;
@@ -4658,20 +5553,39 @@
                     }
                 }
             }
-            dataItem = ds.editView(dataItemIndex).data;
 
-            if (cell) {
+            // NOTE: do not get the data item by using ds.edit() because
+            // it will add it to the change tracker;
+            // instead, take it from the data source view directly
+            //dataItem = ds.editView(dataItemIndex).data;
+            dataItem = ds.view[dataItemIndex];
+
+            if (cell && options.editing.mode != "popup") {
                 self._removeButtons(cell, index);
             }
 
-            row = contentTable.find("tr").get(index);
+            row = contentTable.find(">tbody > tr").get(index);
             var indentCellsCount = parseInt($(row).attr("data-group-level"), 10);
+
+            // see if the currently active cell is part of this row
+            if (navigation) {
+                activeCellIndex = $(row).children('td').index(self._activeCell);
+            }
 
             self._editing._destroyRow(index);
             row = self._renderRow(dataItemIndex, self.contentTable.tbody, dataItem, index);
 
+            // if active cell was part of this row, reinitialize it
+            if (navigation) {
+                if (activeCellIndex > -1) {
+                    self._activeCell = $(row).children('td').eq(activeCellIndex);
+                    $(self._activeCell).focus();
+                }
+            }
+
             for (i = 0; i < indentCellsCount; i++) {
-                $("<td class='sui-indent-cell sui-group-intend-cell'/>").prependTo(row);
+                $('<td class="sui-indent-cell sui-group-intend-cell"/>')
+                    .prependTo(row);
             }
 
             if (indentCellsCount) {
@@ -4679,7 +5593,7 @@
             }
 
             if (self._editing.options.batch) {
-                var cells = row.find(".sui-cell");
+                var cells = row.children(".sui-cell");
 
                 if (self._markedCells && self._markedCells[index]) {
                     var item = self._markedCells[index],
@@ -4689,7 +5603,7 @@
                     for (i = 0; i < item.length; i++) {
                         currentIndex = item[i];
                         html = $(cells[currentIndex]).html();
-                        $(cells[currentIndex]).html("<span class='sui-updated-marker' />" + html);
+                        $(cells[currentIndex]).html('<span class="sui-updated-marker"/>' + html);
                     }
                 }
             }
@@ -4698,7 +5612,7 @@
         _renderUpdateMarkers: function (allUpdatedCellsKyes, rowIndex) {
             var self = this,
                 columns = self.columns,
-                cells = self.contentTable.find("tbody > tr").eq(rowIndex).find(".sui-cell"),
+                cells = self.contentTable.find(">tbody > tr").eq(rowIndex).children(".sui-cell"),
                 i,
                 j,
                 html;
@@ -4707,7 +5621,7 @@
                 for (j = 0; j < columns.length; j++) {
                     if (columns[j].field === allUpdatedCellsKyes[i]) {
                         html = $(cells[j]).html();
-                        $(cells[j]).html("<span class='sui-updated-marker' />" + html);
+                        $(cells[j]).html('<span class="sui-updated-marker"/>' + html);
 
                         if (!self._markedCells) {
                             self._markedCells = {};
@@ -4730,7 +5644,11 @@
                 options = self.options;
 
             if (options.selection) {
-                self._selectable = new Selection(self.headerTable, self.contentTable, options.selection, self);
+                // destroy selectable if set
+                if (self._selectable) {
+                    self._selectable.destroy();
+                }
+                self._selectable = new Selection(options.selection, self);
             }
         },
 
@@ -4739,6 +5657,9 @@
                 options = self.options;
 
             if (options.filtering && options.filtering.enabled) {
+                if (self._filter) {
+                    self._filter.destroy();
+                }
                 self._filter = new Filtering(self);
             }
         },
@@ -4755,7 +5676,7 @@
                     self.pager.element.appendTo(element);
                 }
                 else {
-                    pagerWrapper = $("<div />").appendTo(element);
+                    pagerWrapper = $("<div/>").appendTo(element);
                     pagerWrapper.addClass("sui-pager");
                     self.pagerWrapper = pagerWrapper;
 
@@ -4782,6 +5703,7 @@
             if (!parentRow.length) {
                 parentRow = $(e.target).closest(".sui-alt-row", self.contentTable);
             }
+
             self._toggleDetailTemplate(parentRow);
         },
 
@@ -4854,7 +5776,7 @@
                 indentCell.appendTo(row);
             }
 
-            var cell = $('<td class="sui-detail-cell" colspan="' + self.columns.length + '"></td>'),
+            var cell = $('<td class="sui-detail-cell" colspan="' + self._getVisibleColumnCount() + '"></td>'),
                 args = self.trigger(COMMAND, { commandName: DETAILCREATED, cancel: false, detailCell: cell, item: item });
 
             if (!args.cancel) {
@@ -4927,33 +5849,382 @@
             this.dataSource.read();
         },
 
-        _updateGrid: function () {
-            var self = this,
-                options = shield.extend([Class], self.options, options);
-
-            if (self.sorting) {
-                self.sorting.destroy();
-                self.sorting = null;
-            }
-
-            self.headerWrapper.find(".sui-headercell .sui-link").each(function (index, el) {
-                var anchor = $(el);
-                anchor.parent().html(anchor.html());
-            });
-
-            // remove all span elements in the header that have a class starting with sui-
-            self.headerWrapper.find('.sui-headercell span[class^="sui-"]').remove();
-
-            self._sorting();
-        },
-
         _dsStartHandler: function () {
             this.loading(true);
         },
 
+        _initNavigation: function() {
+            var self = this,
+                element = self.element,
+                navEventNS = self._eventNS + "nav",
+                focusableCellsSelector = ".sui-headercell[tabindex], .sui-filter-cell[tabindex], .sui-cell[tabindex], .sui-footer-cell[tabindex]";
+
+            if (self.options.navigation) {
+                // re-assign events
+                element
+                    .addClass('sui-grid-nav')
+                    .off(navEventNS)
+                    .on(FOCUS + navEventNS, focusableCellsSelector, function(e) {
+                        $(self._activeCell)
+                            .attr(TABINDEX, "-1");
+
+                        self._activeCell = $(this);
+
+                        $(self._activeCell)
+                            .attr(TABINDEX, "0");
+                    });
+
+                // initialize the active cell
+                self._initActiveCell();
+
+                // make the first cell tabindex 0
+                $(self._activeCell).attr(TABINDEX, "0");
+            }
+        },
+
+        _initActiveCell: function() {
+            var self = this;
+
+            if ($(self._activeCell).length <= 0 || !$(self._activeCell).is(":visible")) {
+                self._activeCell = $(self.element).find('.sui-cell[tabindex]').first();
+
+                if ($(self._activeCell).length <= 0) {
+                    self._activeCell = $(self.element).find('.sui-headercell[tabindex]').first();
+                }
+            }
+        },
+
+        // returns whether a cell is being edited
+        _cellEditable: function(cell) {
+            if ($(cell).attr(ARIA_READONLY) == TRUE) {
+                return false;
+            }
+
+            if ($(cell).hasClass('sui-editable-cell')) {
+                return true;
+            }
+
+            return false;
+        },
+
+        _keydown: function(event) {
+            var self = this,
+                element = self.element,
+                code = event.keyCode,
+                options = self.options,
+                navigation = options.navigation,
+                editing = options.editing,
+                selection = options.selection,
+                isCtrlPressed = event.ctrlKey,
+                isShifPressed = event.shiftKey,
+                pager = self.pager,
+                prevent = false,
+                activeCellEditable = self._cellEditable(self._activeCell),
+                next;
+
+            // if event target is a button and ENTER or SPACE was pressed, do not do anything - assume this is a button action
+            if ($(event.target).prop("tagName").toLowerCase() === "button" && (code == keyCode.ENTER || code == keyCode.SPACE)) {
+                return;
+            }
+
+            switch(code) {
+                case keyCode.UP:
+                    if (navigation) {
+                        if (!activeCellEditable) {
+                            next = self._getNextNavCell("up");
+                            if (next) {
+                                $(next).focus();
+                                prevent = true;
+                            }
+                        }
+                    }
+                    break;
+                case keyCode.DOWN:
+                    if (navigation) {
+                        if (!activeCellEditable) {
+                            next = self._getNextNavCell("down");
+                            if (next) {
+                                $(next).focus();
+                                prevent = true;
+                            }
+                        }
+                    }
+                    break;
+                case keyCode.LEFT:
+                    if (navigation) {
+                        if (!activeCellEditable) {
+                            next = self._getNextNavCell("left");
+                            if (next) {
+                                $(next).focus();
+                                prevent = true;
+                            }
+                        }
+                    }
+                    break;
+                case keyCode.RIGHT:
+                    if (navigation) {
+                        if (!activeCellEditable) {
+                            next = self._getNextNavCell("right");
+                            if (next) {
+                                $(next).focus();
+                                prevent = true;
+                            }
+                        }
+                    }
+                    break;
+                case keyCode.HOME:
+                    if (navigation) {
+                        if (!activeCellEditable) {
+                            if (isCtrlPressed) {
+                                next = $(element).find('.sui-cell[tabindex], .sui-headercell[tabindex], .sui-footer-cell[tabindex]').first();
+                            }
+                            else {
+                                next = self._getNextNavCell("first");
+                            }
+                            if (next) {
+                                $(next).focus();
+                                prevent = true;
+                            }
+                        }
+                    }
+                    break;
+                case keyCode.END:
+                    if (navigation) {
+                        if (!activeCellEditable) {
+                            if (isCtrlPressed) {
+                                next = $(element).find('.sui-cell[tabindex], .sui-headercell[tabindex], .sui-footer-cell[tabindex]').last();
+                            }
+                            else {
+                                next = self._getNextNavCell("last");
+                            }
+                            if (next) {
+                                $(next).focus();
+                                prevent = true;
+                            }
+                        }
+                    }
+                    break;
+                case keyCode.ENTER:
+                    if (navigation) {
+                        if ($(self._activeCell).hasClass('sui-cell')) {
+                            // data cell
+                            if (editing) {
+                                if (activeCellEditable) {
+                                    self._updateButtonClicked($(self._activeCell).parent().get(0).rowIndex, $(self._activeCell));
+                                }
+                                else {
+                                    self._editing._editingTriggered(event);
+                                }
+                                prevent = true;
+                            }
+                        }
+                        else if ($(self._activeCell).hasClass('sui-headercell')) {
+                            if ($(self._activeCell).children('.sui-link').length > 0) {
+                                self.one(DATABOUND, proxy(self.focus, self));
+
+                                // sort by that cell by simulating a click on the sort link
+                                $(self._activeCell).children('.sui-link').first().click();
+                            }
+                            prevent = true;
+                        }
+                    }
+                    break;
+                case keyCode.PAGEUP:
+                    if (navigation) {
+                        if (pager && pager.hasPrev()) {
+                            self.one(DATABOUND, proxy(self.focus, self));
+                            self.pager.prev();
+                        }
+                        prevent = true;
+                    }
+                    break;
+                case keyCode.PAGEDOWN:
+                    if (navigation) {
+                        if (pager && pager.hasNext()) {
+                            self.one(DATABOUND, proxy(self.focus, self));
+                            self.pager.next();
+                        }
+                        prevent = true;
+                    }
+                    break;
+                case keyCode.ESC:
+                    if (activeCellEditable) {
+                        self.cancelEditing();
+                        if (navigation) {
+                            $(self._activeCell).focus();
+                        }
+                        prevent = true;
+                    }
+                    break;
+                case keyCode.SPACE:
+                    if (navigation && selection && self._selectable && !activeCellEditable) {
+                        // WARNING: working with private members of the selectable
+
+                        // get the selection elements
+                        self._selectable.elements = getElementsFromEvent(event, self.contentTable, self.frozenContentTable);
+
+                        if (self._selectable.elements) {
+                            self._selectable._performAndProcessSelection(event);
+                        }
+
+                        prevent = true;
+                    }
+                    break;
+                default:
+                    break;
+            }
+
+            if (prevent) {
+                event.preventDefault();
+            }
+        },
+
+        _getNextNavCell: function(movement) {
+            var self = this,
+                element = self.element,
+                activeCell = self._activeCell,
+                row,
+                result;
+
+            if (!activeCell || $(activeCell).length <= 0) {
+                activeCell = $(self.element).find('.sui-cell[tabindex="0"], .sui-headercell[tabindex="0"]').first();
+            }
+
+            if (movement == "left") {
+                result = self.__findPrevFocusCell(activeCell);
+            }
+            else if (movement == "right") {
+                result = self.__findNextFocusCell(activeCell);
+            }
+            else if (movement == "up") {
+                result = self.__findAboveFocusCell(activeCell);
+            }
+            else if (movement == "down") {
+                result = self.__findBelowFocusCell(activeCell);
+            }
+            else if (movement == "first") {
+                result = self.__findFirstFocusCell(activeCell);
+            }
+            else if (movement == "last") {
+                result = self.__findLastFocusCell(activeCell);
+            }
+
+            // TODO: handle frozen columns, nested grids, etc ???
+            // inside these functions called above...
+
+            return result && $(result).length > 0 ? $(result).get(0) : null;
+        },
+
+        __findFirstFocusCell: function(cell) {
+            var self = this,
+                prev = self.__findPrevFocusCell(cell),
+                result;
+            while (prev && prev.length > 0) {
+                result = prev;
+                prev = self.__findPrevFocusCell(prev);
+            }
+            return result;
+        },
+
+        __findLastFocusCell: function(cell) {
+            var self = this,
+                next = self.__findNextFocusCell(cell),
+                result;
+            while (next && next.length > 0) {
+                result = next;
+                next = self.__findNextFocusCell(next);
+            }
+            return result;
+        },
+
+        __findPrevFocusCell: function(cell) {
+            var prev = $(cell).prev();
+            while (prev && prev.length > 0) {
+                if (hasAttribute(prev, TABINDEX)) {
+                    return prev;
+                }
+                prev = $(cell).prev();
+            }
+            return UNDEFINED;
+        },
+
+        __findNextFocusCell: function(cell) {
+            var next = $(cell).next();
+            while (next && next.length > 0) {
+                if (hasAttribute(next, TABINDEX)) {
+                    return next;
+                }
+                next = $(cell).next();
+            }
+            return UNDEFINED;
+        },
+
+        __findAboveFocusCell: function(cell) {
+            var self = this,
+                row = $(cell).closest('tr'),
+                cellIndex = $(cell).index(),
+                rows = self.headerTable.find('>thead > tr')
+                    .add(self.contentTable.find('>tbody > tr'))
+                    .add(self.contentTable.find('>tfoot > tr')),
+                rowIndex = $(rows).index(row),
+                result;
+
+            while (rowIndex > 0) {
+                result = $($(rows)[rowIndex-1]).children().eq(cellIndex);
+                if (hasAttribute(result, TABINDEX)) {
+                    return result;
+                }
+                rowIndex--;
+            }
+
+            return UNDEFINED;
+        },
+
+        __findBelowFocusCell: function(cell) {
+            var self = this,
+                row = $(cell).closest('tr'),
+                cellIndex = $(cell).index(),
+                rows = self.headerTable.find('>thead > tr')
+                    .add(self.contentTable.find('>tbody > tr'))
+                    .add(self.contentTable.find('>tfoot > tr')),
+                rowIndex = $(rows).index(row),
+                result;
+
+            while (rowIndex < rows.length - 1) {
+                result = $($(rows)[rowIndex+1]).children().eq(cellIndex);
+                if (hasAttribute(result, TABINDEX)) {
+                    return result;
+                }
+                rowIndex++;
+            }
+
+            return UNDEFINED;
+        },
+
+        // focuses the first 
+        focus: function() {
+            var self = this;
+
+            if (self.options.navigation) {
+                self._initActiveCell();
+                
+                if ($(self._activeCell).length > 0) {
+                    $(self._activeCell).focus();
+                }
+                else {
+                    focusFirst(self.element);
+                }
+            }
+            else {
+                focusFirst(self.element);
+            }
+        },
+
         refresh: function (options) {
             var self = this,
-                dataSourceOptions = options ? options.dataSource : null;
+                dataSourceOptions = options ? options.dataSource : null,
+                eventNS = self._eventNS,
+                i;
 
             options = shield.extend([Class], self.options, options);
 
@@ -4964,6 +6235,7 @@
             }
 
             var dataSource,
+                element = self.element,
                 scrolling = options.scrolling,
                 paging = self.pager ? self.pager.options : options.paging,
                 scrollLeft = 0;
@@ -4975,8 +6247,21 @@
             self._destroyInternal();
 
             dataSource = self.dataSource = DataSource.create(options.dataSource);
-            dataSource.on(CHANGE, self._dsChange = proxy(self._renderData, self));
-            dataSource.on(START, self._dsStart = proxy(self._dsStartHandler, self));
+
+            // ARIA
+            element
+                .attr(ROLE, "grid")
+                .on(KEYDOWN + eventNS, proxy(self._keydown, self));
+            // if not editable, add aria-readonly for the grid
+            if (!options.editing) {
+                element.attr(ARIA_READONLY, TRUE);
+            }
+
+            dataSource
+                .on(CHANGE + eventNS, proxy(self._renderData, self))
+                .on(START + eventNS, proxy(self._dsStartHandler, self));
+
+            $(win).on(RESIZE + eventNS, proxy(self._resizeHandler, self));
 
             self._resolveColumns(options.columns);
 
@@ -4988,13 +6273,14 @@
             self._initToolbar();
             self._initEditing();
 
-            self._selection();
+            self._filtering();
+
             self._paging(paging);
 
             self._resizing();
             self._reorder();
 
-            self._filtering();
+            self._initNavigation();
 
             if (!self.pager) {
                 self.dataSource.read();
@@ -5002,16 +6288,18 @@
 
             self._sorting();
 
-            self._rsNS = '.rs.' + self.getInstanceId();
-            $(win).on(RESIZE + self._rsNS, self._resize = proxy(self._resizeHandler, self));
-
             if (scrollLeft) {
                 self.contentWrapper.get(0).scrollLeft = scrollLeft;
             }
         },
 
-        loading: function (isLoading) {
-            var self = this;
+        loading: function (isLoading, showImmediately) {
+            var self = this,
+                showFunc = function() {
+                    if (self.loadingPanel) {
+                        self.loadingPanel.show();
+                    }
+                };
 
             if (shield.ui.LoadingPanel) {
                 if (isLoading) {
@@ -5019,11 +6307,12 @@
                         self.loadingPanel = new shield.ui.LoadingPanel(self.element.get(0));
                     }
 
-                    self.loadingPanelTimeout = setTimeout(function () {
-                        if (self.loadingPanel) {
-                            self.loadingPanel.show();
-                        }
-                    }, 50);
+                    if (showImmediately) {
+                        showFunc();
+                    }
+                    else {
+                        self.loadingPanelTimeout = setTimeout(showFunc, 50);
+                    }
                 }
                 else if (self.loadingPanel) {
                     clearTimeout(self.loadingPanelTimeout);
@@ -5037,7 +6326,14 @@
             var self = this,
                 selectable = self._selectable;
 
-            items = $(items);
+            if (isString(items)) {
+                // if items is a string, treat is as a selector and find all rows inside the contentTable
+                items = self.contentTable.find(items);
+            }
+            else {
+                items = $(items);
+            }
+
             if (items.length) {
                 if (!selectable.multiple) {
                     selectable.clear();
@@ -5047,7 +6343,28 @@
                 return;
             }
 
-            return selectable.value();
+            return selectable.select();
+        },
+
+        // returns the indices of the selected rows as a dictionary, 
+        // containing two lists - the view indices and data indices of the selected rows
+        selectedRowIndices: function() {
+            var self = this,
+                viewIndices = [],
+                dataIndices = [];
+
+            self.contentTable.children('tbody').children(".sui-row, .sui-alt-row").each(function() {
+                if ($(this).hasClass(SELECTED)) {
+                    var viewIndex = self._getRowIndex($(this));
+                    viewIndices.push(viewIndex);
+                    dataIndices.push(viewIndex >= 0 ? self.dataSource.getDataIndex(viewIndex) : viewIndex);
+                }
+            });
+
+            return {
+                view: viewIndices,
+                data: dataIndices
+            };
         },
 
         clearSelection: function () {
@@ -5060,21 +6377,22 @@
             }
         },
 
-        _getItemRow: function(row) {
+        // gets the row by an index or a row
+        _getItemRow: function (row) {
             if (isNumber(row)) {
                 // row is an index, so find it in the details
-                row = this.contentTable.children('tbody').children(".sui-row, .sui-alt-row").get(row);
+                return $(this.contentTable.children('tbody').children(".sui-row, .sui-alt-row").get(row));
             }
-            return row;
+            return $(row);
         },
 
         expandRow: function (row) {
             var self = this,
-                expandRow = $(self._getItemRow(row)),
+                expandRow = self._getItemRow(row),
                 detailRow = expandRow.next();
 
             if (detailRow.hasClass("sui-detail-row")) {
-                if (detailRow.css("display") == "none") {
+                if (detailRow.css(DISPLAY) == NONE) {
                     self._toggleDetailTemplate(expandRow);
                 }
             }
@@ -5085,11 +6403,11 @@
 
         collapseRow: function (row) {
             var self = this,
-                collapseRow = $(self._getItemRow(row)),
+                collapseRow = self._getItemRow(row),
                 detailRow = collapseRow.next();
 
             if (detailRow.hasClass("sui-detail-row")) {
-                if (detailRow.css("display") != "none") {
+                if (detailRow.css(DISPLAY) != NONE) {
                     self._toggleDetailTemplate(collapseRow);
                 }
             }
@@ -5099,14 +6417,14 @@
             }
         },
 
-        reorderColumn: function (index, newIndex) {
+        reorderColumn: function (index, newIndex, force) {
             var self = this,
                 element = self.element,
                 columns = self.columns,
                 columnOptions = self.options.columns || [],
                 header = self.headerWrapper,
                 method = "before",
-                indent = header.find(".sui-indent-cell").length,
+                indent = header.find(".sui-columnheader").first().find(".sui-indent-cell").length,
                 column;
 
             index = +index;
@@ -5124,9 +6442,17 @@
                 method = "after";
             }
 
+            // if the column is locked or invisible, do not do anything
+            column = columns[index];
+            if (!column.visible || (!force && column.locked)) {
+                return;
+            }
+
+            // reorder the column in the columns list
             column = columns.splice(index, 1)[0];
             columns.splice(newIndex, 0, column);
 
+            // reorder the column in the column options
             column = columnOptions.splice(index, 1)[0];
             columnOptions.splice(newIndex, 0, column);
 
@@ -5135,6 +6461,7 @@
 
             element.find(".sui-gridheader col:nth-child(" + (index + 1) + ")")
                 .add(element.find(".sui-gridheader .sui-columnheader th:nth-child(" + (index + 1) + ")"))
+                .add(element.find(".sui-gridheader .sui-filter-row th:nth-child(" + (index + 1) + ")"))
                 .add(element.find(".sui-gridcontent col:nth-child(" + (index + 1) + ")"))
                 .add(element.find(".sui-gridcontent tr:not(.sui-detail-row) td:nth-child(" + (index + 1) + ")"))
                 .each(function () {
@@ -5170,7 +6497,7 @@
 
         editCell: function (rowIndex, colIndex) {
             var self = this,
-                cell = self.contentTable.find("tbody > tr").eq(rowIndex).find("td").eq(colIndex).get(0);
+                cell = self.contentTable.find(">tbody > tr").eq(rowIndex).children("td").eq(colIndex).get(0);
 
             self._editingInProcess = true;
             self._editing._putCellInEditMode(cell, rowIndex);
@@ -5178,10 +6505,20 @@
 
         editRow: function (rowIndex) {
             var self = this,
-                row = self.contentTable.find("tbody > tr").eq(rowIndex).get(0);
+                row = self.contentTable.find(">tbody > tr").eq(rowIndex).get(0);
 
             self._editingInProcess = true;
             self._editing._putRowInEditMode($(row), 0);
+        },
+
+        editRowPopup: function(rowIndex) {
+            var self = this;
+
+            self._editingInProcess = true;
+
+            if (shield.ui.Window) {
+                self._initializePopupForm(rowIndex);
+            }
         },
 
         cancelEditing: function () {
@@ -5196,6 +6533,8 @@
 
                 self._putRowInViewMode(rowIndex, $(cell));
             }
+
+            self._editingInProcess = false;
         },
 
         // deletes a row / data item using the specified view index
@@ -5220,6 +6559,7 @@
         group: function (dataField, index, order, aggregates) {
             var self = this,
                 groups = self.dataSource.group;
+
             if (groups) {
                 groups.splice(index, 0, { field: dataField, order: order, aggregates: aggregates });
             }
@@ -5231,10 +6571,12 @@
 
         ungroup: function (dataField) {
             var self = this,
-                groups = self.dataSource.group;
+                groups = self.dataSource.group,
+                i;
 
             self.headerTable.thead.find(".sui-columnheader > .sui-indent-cell").remove();
-            for (var i = 0; i < groups.length; i++) {
+
+            for (i = 0; i < groups.length; i++) {
                 if (groups[i].field == dataField) {
                     groups.splice(i, 1);
                     if (groups.length === 0) {
@@ -5251,8 +6593,8 @@
                 groupLevel = parseInt(row.attr("data-group-level"), 10);
 
             while (shouldHideNextRow) {
+                row = row.next().css(DISPLAY, NONE);
 
-                row = row.next().css("display", "none");
                 if (row.next().length > 0) {
                     var nextRowGroupLevel = parseInt(row.next().attr("data-group-level"), 10);
                     if (nextRowGroupLevel <= groupLevel && row.next().hasClass("sui-group-header")) {
@@ -5267,11 +6609,11 @@
 
         expandGroup: function (row) {
             var self = this,
-                            shouldHideNextRow = true,
-                            groupLevel = parseInt(row.attr("data-group-level"), 10);
+                shouldHideNextRow = true,
+                groupLevel = parseInt(row.attr("data-group-level"), 10);
 
             while (shouldHideNextRow) {
-                row = row.next().css("display", "");
+                row = row.next().css(DISPLAY, "");
                 if (row.hasClass("sui-group-header")) {
                     if (row.find(".sui-expand").length > 0) {
                         return;
@@ -5287,7 +6629,708 @@
                     shouldHideNextRow = false;
                 }
             }
+        },
+
+        _getColumnByField: function (fieldName) {
+            var self = this,
+                columns = self.columns || [],
+                i;
+
+            for (i = 0; i < columns.length; i++) {
+                if (columns[i].field === fieldName) {
+                    return columns[i];
+                }
+            }
+
+            return UNDEFINED;
+        },
+
+        _refreshColVisibility: function() {
+            var self = this,
+                columns = self.columns,
+                columnsLength = columns.length,
+                i,
+                hasHidden = false;
+
+            // optimization - do this only if there is at least one hidden,
+            // because the default state and rendering of the columns is visible
+            for (i=0; i<columnsLength; i++) {
+                if (!columns[i].visible) {
+                    hasHidden = true;
+                    break;
+                }
+            }
+
+            if (!hasHidden) {
+                return;
+            }
+
+            // make sure each column is shown or hidden
+            for (i=0; i<columnsLength; i++) {
+                if (columns[i].visible) {
+                    self.showColumn(columns[i].field);
+                }
+                else {
+                    self.hideColumn(columns[i].field);
+                }
+            }
+        },
+
+        _getNextVisibleColumnRealIndex: function (gridColumn) {
+            // returns the index of the next-visible column, closest to the given one
+            var self = this,
+                columns = self.columns,
+                i;
+
+            for (i=gridColumn.index+1; i<columns.length; i++) {
+                if (columns[i].visible) {
+                    return i;
+                }
+            }
+
+            return -1;
+        },
+
+        isHidden: function(fieldName) {
+            var column = this._getColumnByField(fieldName);
+            return column ? !column.visible : UNDEFINED;
+        },
+
+        hideColumn: function (fieldName) {
+            var self = this,
+                element = $(self.element),
+                column = self._getColumnByField(fieldName);
+
+            if (!column || column.locked) {
+                return;
+            }
+
+            // make sure the respective header col is hidden
+            $(self.headerTable).find('colgroup').first().find("col").each(function() {
+                if ($(this).data(SUI_FIELDNAME) == fieldName) {
+                    self._gridColumns[fieldName].headerCol = $(this);
+                    $(this).detach();   // use .detach() instead of .remove() to preserve the .data()
+                    return false;
+                }
+            });
+
+            // make sure the respective content col is hidden
+            $(self.contentTable).find('colgroup').first().find("col").each(function() {
+                if ($(this).data(SUI_FIELDNAME) == fieldName) {
+                    self._gridColumns[fieldName].contentCol = $(this);
+                    $(this).detach();   // use .detach() instead of .remove() to preserve the .data()
+                    return false;
+                }
+            });
+
+            // hide the TDs
+            self._changeColumnVisibility(fieldName, "hide");
+
+            column.visible = false;
+
+            self._afterColumnVisibilityChange();
+        },
+
+        showColumn: function (fieldName) {
+            var self = this,
+                element = $(self.element),
+                column = self._getColumnByField(fieldName),
+                headerColgroup = $(self.headerTable).find('colgroup'),
+                contentColgroup = $(self.contentTable).find('colgroup'),
+                gridColumn,
+                headerCol,
+                contentCol,
+                position,
+                nextVisibleColumnField;
+
+            if (!column || column.locked) {
+                return;
+            }
+
+            gridColumn = self._gridColumns[fieldName];
+            headerCol = gridColumn.headerCol;
+            contentCol = gridColumn.contentCol;
+
+            // find the position to put the cols on
+            position = self._getNextVisibleColumnRealIndex(gridColumn);
+
+            // place the colgroups on the correct position
+            if (position === -1) {
+                headerColgroup.append(headerCol);
+                contentColgroup.append(contentCol);
+            }
+            else {
+                // get the field name of the next visible column by its real index
+                nextVisibleColumnField = self.columns[position].field;
+
+                // find the header col for the next visible one and insert the current before it
+                headerColgroup.find('col').each(function() {
+                    if ($(this).data(SUI_FIELDNAME) == nextVisibleColumnField) {
+                        $(headerCol).insertBefore($(this));
+                        return false;
+                    }
+                });
+
+                // find the content col for the next visible one and insert the current before it
+                contentColgroup.find('col').each(function() {
+                    if ($(this).data(SUI_FIELDNAME) == nextVisibleColumnField) {
+                        $(contentCol).insertBefore($(this));
+                        return false;
+                    }
+                });
+            }
+
+            // show the TDs
+            self._changeColumnVisibility(fieldName, "show");
+
+            // reset some gridColumn properties that are only there for hidden columns
+            gridColumn.headerCol = gridColumn.contentCol = UNDEFINED;
+
+            column.visible = true;
+
+            self._afterColumnVisibilityChange();
+        },
+
+        _changeColumnVisibility: function (fieldName, func) {
+            var self = this,
+                element = $(self.element),
+                header = $(self.headerTable).find(".sui-columnheader").first(),
+                headerFilter = $(self.headerTable).find(".sui-filter-row").first(),
+                cellIndex = -1,
+                rows,
+				i;
+
+            // find the cell index
+            if (header.length) {
+                $(header).children().each(function(index) {
+                    if ($(this).attr('data-field') == fieldName) {
+                        cellIndex = index;
+                        return false;
+                    }
+                });
+            }
+
+            // do not proceed if col not found
+            if (cellIndex < 0) {
+                return;
+            }
+
+            // toggle the header cell
+            $(header.find("th")[cellIndex])[func]();
+
+            // toggle the header filter
+            $(headerFilter.find("th")[cellIndex])[func]();
+
+            // find and toggle the row cells
+            rows = element.find("> .sui-gridcontent > table > tbody > tr");
+
+            if (rows.length === 0) {
+                rows = element.find("> .sui-gridcontent > .sui-virtualized > table > tbody > tr");
+            }
+
+            if (rows.length === 0) {
+                rows = element.find("> .sui-gridcontent > .sui-content > table > tbody > tr");
+            }
+
+            for (i=0; i<rows.length; i++) {
+                $(rows[i].cells[cellIndex])[func]();
+            }
+        },
+
+        _afterColumnVisibilityChange: function() {
+            var self = this,
+                visibleColumnCount = self._getVisibleColumnCount(),
+                dataSource = self.dataSource,
+                dsGroupLength = dataSource.group ? dataSource.group.length : 0;
+
+            // update the colspan of cells spanning to more than one column
+            $(self.contentTable).find('.sui-grid-norecords-cell, .sui-detail-cell, .sui-group-header-cell').each(function() {
+                if ($(this).hasClass('sui-group-header-cell')) {
+                    $(this).attr('colspan', visibleColumnCount + dsGroupLength - toInt($(this).parent().attr('data-group-level')) + 1);
+                }
+                else {
+                    $(this).attr('colspan', visibleColumnCount);
+                }
+            });
+        },
+
+        _getVisibleColumnFields: function() {
+            var self = this,
+                columns = self.columns || [],
+                columnsLen = columns.length,
+                fields = [],
+                i;
+
+            for (i=0; i<columnsLen; i++) {
+                if (columns[i].visible) {
+                    fields.push(columns[i].field);
+                }
+            }
+
+            return fields;
+        },
+
+        // Frozen columns
+
+        // NOTE: the method below should be called on a clean grid - 
+        // it assumes that all cols are rendered as unlocked initially
+        _initFrozenCols: function() {
+            var self = this,
+                columns = self.columns,
+                columnsLength = columns.length,
+                i,
+                hasLocked = false;
+
+            // optimization - do this only if there is at least one locked,
+            // because the default state and rendering of the columns is unlocked
+            for (i=0; i<columnsLength; i++) {
+                if (columns[i].locked) {
+                    hasLocked = true;
+                    break;
+                }
+            }
+
+            if (!hasLocked) {
+                return;
+            }
+
+            // init the frozen containers
+            self._initFrozenContainers();
+
+            // make sure each locked column is locked
+            for (i=0; i<columnsLength; i++) {
+                if (columns[i].locked) {
+                    self.lockColumn(columns[i].field);
+                }
+            }
+        },
+
+        _initFrozenContainers: function() {
+            var self = this,
+                options = self.options,
+                scrolling = options.scrolling;
+
+            if (!self.frozenHeaderWrapper) {
+                self.frozenHeaderWrapper = $('<div class="sui-header-locked"/>')
+                    .prependTo(scrolling ? self.headerWrapper.parent() : self.headerWrapper);
+
+                self.frozenHeaderTable = $(
+                    '<table class="sui-table sui-non-selectable"' + (isIE7 ? ' cellspacing="0"' : '') + '>' + 
+                        '<colgroup/>' + 
+                        '<thead>' + 
+                            '<tr class="sui-columnheader"/>' + 
+                            (options.filtering && options.filtering.enabled ? '<tr class="sui-filter-row"/>' : '') + 
+                        '</thead>' + 
+                        '<tbody class="sui-hide"/>' + 
+                    '</table>'
+                ).appendTo(self.frozenHeaderWrapper);
+            }
+
+            if (!self.frozenContentWrapper) {
+                self.frozenContentWrapper = $('<div class="sui-content-locked"/>')
+                    .prependTo(scrolling ? self.contentWrapper.parent() : self.contentWrapper);
+
+                self.frozenContentWrapper.height(self.frozenContentWrapper.parent().find('.sui-content').first().height());
+
+                self.frozenContentTable = $(
+                    '<table class="sui-table' + (options.rowHover ? ' sui-hover' : '') + '"' + (isIE7 ? ' cellspacing="0"' : '') + '>' + 
+                        '<colgroup/>' + 
+                        '<tbody/>' + 
+                        '<tfoot>' + // WARNING: that kind of rendering will work only for footers in non-virtual grids
+                            '<tr class="sui-grid-footer"/>' + 
+                        '</tfoot>' + 
+                    '</table>'
+                ).appendTo(self.frozenContentWrapper);
+
+                if (self._hasDetailTemplate()) {
+                    if (self._canExpandCollapse()) {
+                        self.frozenContentTable.addClass("sui-expandable");
+                    }
+
+                    // NOTE: find the proper cells - only those for the main grid (and not for nested ones)
+                    self.frozenContentTable.on(
+                        CLICK + self._eventNS, 
+                        "> tbody > tr > .sui-expand-cell, > tbody > tr > .sui-collapse-cell", 
+                        proxy(self._expandCollapseDetailTemplate, self)
+                    );
+                }
+            }
+        },
+
+        _destroyFrozenContainers: function() {
+            var self = this;
+
+            if (self.frozenHeaderWrapper) {
+                $(self.frozenHeaderWrapper).remove();
+                self.frozenHeaderWrapper = null;
+            }
+
+            if (self.frozenContentWrapper) {
+                $(self.frozenContentWrapper).find('.sui-table').off(self._eventNS);
+                $(self.frozenContentWrapper).remove();
+                self.frozenContentWrapper = null;
+            }
+        },
+
+        isLocked: function(fieldName) {
+            var column = this._getColumnByField(fieldName);
+            return column ? column.locked : UNDEFINED;
+        },
+
+        lockColumn: function(fieldName) {
+            var self = this,
+                element = $(self.element),
+                filteringOptions = self.options.filtering,
+                column = self._getColumnByField(fieldName),
+                cellIndex = -1,
+                footer = self._footer,
+                rows,
+                i;
+
+            if (!column || !column.visible) {
+                return;
+            }
+
+            // move the respective header col to the locked table
+            $(self.headerTable).find('colgroup').first().find("col").each(function() {
+                if ($(this).data(SUI_FIELDNAME) == fieldName) {
+                    $(this).appendTo($(self.frozenHeaderTable).find('colgroup'));
+                    return false;
+                }
+            });
+
+            // move the respective content col to the locked table
+            $(self.contentTable).find('colgroup').first().find("col").each(function() {
+                if ($(this).data(SUI_FIELDNAME) == fieldName) {
+                    $(this).appendTo($(self.frozenContentTable).find('colgroup'));
+                    return false;
+                }
+            });
+
+            // find the index of the cell by looking in the header row and move the TH
+            $(self.headerTable).find(".sui-columnheader").children().each(function(index) {
+                if ($(this).attr('data-field') == fieldName) {
+                    cellIndex = index;
+                    $(this).appendTo($(self.frozenHeaderTable).find('.sui-columnheader'));
+                    return false;
+                }
+            });
+
+            // find and move any filter
+            if (filteringOptions && filteringOptions.enabled && cellIndex >= 0) {
+                $(self.headerTable).find(".sui-filter-row").children().each(function(index) {
+                    if ($(this).attr('data-field') == fieldName) {
+                        $(this).appendTo($(self.frozenHeaderTable).find('.sui-filter-row'));
+                        return false;
+                    }
+                });
+            }
+
+            // find any footer
+            if (footer && cellIndex >= 0) {
+                // NOTE: fix this for virtual grid
+                var frozenFooterRow = $(self.frozenContentTable).find('> tfoot > .sui-grid-footer');
+
+                $(footer).find('.sui-grid-footer td:eq(' + cellIndex + ')').appendTo(frozenFooterRow);
+            }
+
+            if (cellIndex >= 0) {
+                // find the rows and move the TDs
+                rows = element.find("> .sui-gridcontent > table > tbody > tr");
+
+                if (rows.length === 0) {
+                    rows = element.find("> .sui-gridcontent > .sui-virtualized > table > tbody > tr");
+                }
+
+                if (rows.length === 0) {
+                    rows = element.find("> .sui-gridcontent > .sui-content > table > tbody > tr");
+                }
+
+                var frozenContentTableTbody = $(self.frozenContentTable).find('tbody'),
+                    hasLockedRows = frozenContentTableTbody.children().length > 0;
+
+                for (i=0; i<rows.length; i++) {
+                    var targetRow = null;
+
+                    if (!hasLockedRows) {
+                        // no TRs have been created - 
+                        targetRow = $(rows[i]).clone(true, false).empty().appendTo(frozenContentTableTbody);
+                    }
+                    else {
+                        // TRs have been created - so find the correct one by index
+                        //targetRow = $(frozenContentTableTbody).find('tr:eq(' + i + ')');
+                        targetRow = $(frozenContentTableTbody).children()[i];
+                    }
+
+                    $(rows[i].cells[cellIndex]).appendTo(targetRow);
+                }
+            }
+
+            column.locked = true;
+
+            // adjust the main header and content widths
+            self._adjustWidthsLocked();
+            self._adjustHeightsLocked();
+        },
+
+        unlockColumn: function(fieldName) {
+            var self = this,
+                element = $(self.element),
+                filteringOptions = self.options.filtering,
+                columns = self.columns,
+                footer = self._footer,
+                column = self._getColumnByField(fieldName),
+                lockedHeaderCol,
+                lockedHeaderIndex = -1,
+                lockedContentCol,
+                lockedContentIndex = -1,
+                nextUnlockedColumnField,
+                i;
+
+            if (!column || !column.visible) {
+                return;
+            }
+
+            // find the colgroups
+            $(self.frozenHeaderTable).find('colgroup').first().children().each(function() {
+                if ($(this).data(SUI_FIELDNAME) == fieldName) {
+                    lockedHeaderCol = $(this);
+                    lockedHeaderIndex = $(this).index();
+                    return false;
+                }
+            });
+
+            $(self.frozenContentTable).find('colgroup').first().children().each(function() {
+                if ($(this).data(SUI_FIELDNAME) == fieldName) {
+                    lockedContentCol = $(this);
+                    lockedContentIndex = $(this).index();
+                    return false;
+                }
+            });
+
+            for (i=0; i<columns.length; i++) {
+                if (columns[i].field === fieldName) {
+                    if (i <= columns.length - 2) {
+                        nextUnlockedColumnField = columns[i+1].field;
+                    }
+                    break;
+                }
+            }
+
+            // move the col-s
+            if (nextUnlockedColumnField) {
+                // find the header col
+                $(self.headerTable).find('> colgroup col').each(function(index) {
+                    if ($(this).data(SUI_FIELDNAME) === nextUnlockedColumnField) {
+                        // move the col
+                        $(lockedHeaderCol).insertBefore($(this));
+                        
+                        // move the TH
+                        $(self.frozenHeaderTable).find('.sui-columnheader th:eq(' + lockedHeaderIndex + ')').insertBefore(
+                            $(self.headerTable).find('.sui-columnheader th:eq(' + index + ')')
+                        );
+
+                        // move the filter
+                        if (filteringOptions && filteringOptions.enabled) {
+                            $(self.frozenHeaderTable).find('.sui-filter-row th:eq(' + lockedHeaderIndex + ')').insertBefore(
+                                $(self.headerTable).find('.sui-filter-row th:eq(' + index + ')')
+                            );
+                        }
+
+                        // move the footer
+                        if (footer) {
+                            // NOTE: fix this to work for virtual mode
+                            var frozenFooterRow = $(self.frozenContentTable).find('> tfoot > .sui-grid-footer');
+
+                            $(frozenFooterRow).find('td:eq(' + lockedHeaderIndex + ')').insertBefore(
+                                $(footer).find('.sui-grid-footer td:eq(' + index + ')')
+                            );
+                        }
+
+                        return false;
+                    }
+                });
+
+                // find the content col
+                $(self.contentTable).find('> colgroup col').each(function(index) {
+                    if ($(this).data(SUI_FIELDNAME) === nextUnlockedColumnField) {
+                        // move the col
+                        $(lockedContentCol).insertBefore($(this));
+
+                        // move the TDs
+                        var contentTableRows = $(self.contentTable).find('>tbody').first().children();
+
+                        $(self.frozenContentTable).find('>tbody > tr').each(function(rowIndex) {
+                            $(this).find('td:eq(' + lockedContentIndex + ')').insertBefore(
+                                $(contentTableRows[rowIndex]).find('td:eq(' + index + ')')
+                            );
+                        });
+
+                        return false;
+                    }
+                });
+            }
+            else {
+                // append the locked col to the 
+                $(self.headerTable).find('colgroup').append(lockedHeaderCol);
+                $(self.contentTable).find('colgroup').append(lockedContentCol);
+
+                // move the TH
+                $(self.frozenHeaderTable).find('.sui-columnheader th:eq(' + lockedHeaderIndex + ')').appendTo(
+                    $(self.headerTable).find('.sui-columnheader')
+                );
+
+                // move the filter
+                if (filteringOptions && filteringOptions.enabled) {
+                    $(self.frozenHeaderTable).find('.sui-filter-row th:eq(' + lockedHeaderIndex + ')').appendTo(
+                        $(self.headerTable).find('.sui-filter-row')
+                    );
+                }
+
+                // move the footer
+                if (footer) {
+                    // NOTE: fix this to work for virtual mode
+                    var frozenFooterRow = $(self.frozenContentTable).find('> tfoot > .sui-grid-footer');
+
+                    $(frozenFooterRow).find('td:eq(' + lockedHeaderIndex + ')').appendTo(
+                        $(footer).find('.sui-grid-footer')
+                    );
+                }
+
+                // move the TDs
+                var contentTableRows = $(self.contentTable).find('>tbody').first().children();
+
+                $(self.frozenContentTable).find('>tbody > tr').each(function(rowIndex) {
+                    $(this).find('td:eq(' + lockedContentIndex + ')').appendTo(
+                        $(contentTableRows[rowIndex])
+                    );
+                });
+            }
+
+            column.locked = false;
+
+            // adjust the main header and content widths
+            self._adjustWidthsLocked();
+            self._adjustHeightsLocked();
+        },
+
+        _adjustWidthsLocked: function() {
+            var self = this;
+
+            if (self.frozenHeaderWrapper) {
+                // clear the padding from the header added by scrolling
+                $(self.headerWrapper).parent().css((support.isRtl(self.element) ? "padding-left" : "padding-right"), 0);
+
+                $(self.headerWrapper).outerWidth($(self.headerWrapper).parent().innerWidth() - $(self.frozenHeaderWrapper).outerWidth() - support.scrollbar());
+                $(self.contentWrapper).outerWidth($(self.contentWrapper).parent().innerWidth() - $(self.frozenContentWrapper).outerWidth() - 1);
+            }
+        },
+
+        _adjustHeightsLocked: function(reinitScrolling) {
+            var self = this,
+                filterOptions = self.options.filtering,
+                footer = self._footer,
+                frozenRows,
+                frozenRowHeight,
+                rows,
+                rowHeight,
+                frozenHeaderRow,
+                frozenHeaderHeight,
+                headerRow,
+                headerHeight,
+                filterHeaderRow,
+                filterHeaderHeight,
+                filterRow,
+                filterHeight,
+                i;
+
+            if (self.frozenHeaderWrapper) {
+                // sync header row heights - choose the maximum of the two
+                frozenHeaderRow = $(self.frozenHeaderTable).find("tr").first();
+                frozenHeaderRow.height("auto"); // reset the height to auto-size
+                frozenHeaderHeight = toInt(frozenHeaderRow.height());
+                headerRow = $(self.headerTable).find("tr").first();
+                headerRow.height("auto"); // reset the height to auto-size
+                headerHeight = toInt(headerRow.height());
+
+                if (frozenHeaderHeight > headerHeight) {
+                    frozenHeaderRow.height(frozenHeaderHeight);
+                    headerRow.height(frozenHeaderHeight);
+                }
+                else if (frozenHeaderHeight < headerHeight) {
+                    frozenHeaderRow.height(headerHeight);
+                    headerRow.height(headerHeight);
+                }
+
+                // sync filter row height
+                if (filterOptions && filterOptions.enabled) {
+                    filterHeaderRow = $(self.frozenHeaderTable).find("tr.sui-filter-row").first();
+                    filterHeaderRow.height("auto");
+                    filterHeaderHeight = toInt(filterHeaderRow.height());
+
+                    filterRow = $(self.headerTable).find("tr.sui-filter-row").first();
+                    filterRow.height("auto"); // reset the height to auto-size
+                    filterHeight = toInt(filterRow.height());
+                    
+                    if (filterHeaderHeight > filterHeight) {
+                        filterHeaderRow.height(filterHeaderHeight);
+                        filterRow.height(filterHeaderHeight);
+                    }
+                    else if (filterHeaderHeight < filterHeight) {
+                        filterHeaderRow.height(filterHeight);
+                        filterRow.height(filterHeight);
+                    }
+                }
+
+                // sync all rows heights - choosing the maximum of the two
+                frozenRows = $(self.frozenContentTable).find('tbody').first().children();
+                rows = $(self.contentTable).find('> tbody').children();
+                for (i=0; i<rows.length; i++) {
+                    $(frozenRows[i]).height("auto"); // reset the height to auto-size
+                    frozenRowHeight = toInt($(frozenRows[i]).height());
+
+                    $(rows[i]).height("auto"); // reset the height to auto-size
+                    rowHeight = toInt($(rows[i]).height());
+
+                    if (frozenRowHeight > rowHeight) {
+                        $(frozenRows[i]).height(frozenRowHeight);
+                        $(rows[i]).height(frozenRowHeight);
+                    }
+                    else if (frozenRowHeight < rowHeight) {
+                        $(frozenRows[i]).height(rowHeight);
+                        $(rows[i]).height(rowHeight);
+                    }
+                }
+
+                // sync the footer heights - choose the maximum of the two
+                if (footer) {
+                    // NOTE: fix this to work with virtualized mode
+                    var frozenFooterRow = $(self.frozenContentTable).find('> tfoot > .sui-grid-footer'),
+                        footerRow = $(footer).find('.sui-grid-footer').first(),
+                        frozenFooterRowHeight,
+                        footerRowHeight;
+
+                    frozenFooterRow.height("auto");
+                    frozenFooterRowHeight = toInt(frozenFooterRow.height());
+                    footerRow.height("auto");
+                    footerRowHeight = toInt(footerRow.height());
+
+                    if (frozenFooterRowHeight > footerRowHeight) {
+                        frozenFooterRow.height(frozenFooterRowHeight);
+                        footerRow.height(frozenFooterRowHeight);
+                    }
+                    else if (frozenFooterRowHeight < footerRowHeight) {
+                        frozenFooterRow.height(footerRowHeight);
+                        footerRow.height(footerRowHeight);
+                    }
+                }
+
+                if (reinitScrolling) {
+                    self._initScrolling();
+                }
+            }
         }
+        
     });
 
     Grid.defaults = defaults;

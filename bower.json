@@ -31,5 +31,6 @@
   "devDependencies": {
     "qunit": "~1.18.0",
     "sinon": "~1.14.1"
-  }
+  },
+  "version": "1.7.31"
 }

@@ -1,5 +1,5 @@
 (function ($, shield, window, undefined) {
-    "use strict";
+    //"use strict";
 
     var Class = shield.Class,
         Dispatcher = shield.Dispatcher,
@@ -32,6 +32,8 @@
         COMPLETE = "complete",
         SAVE = "save",
 		AFTERSET = "afterset",
+        INSERT = "insert",
+        REMOVE = "remove",
 
         LocalClient,
         RemoteClient,
@@ -41,6 +43,7 @@
         QueryFilter,
         QueryAggregate,
         DataSource,
+        RecursiveDataSource,
         Schema,
         XmlSchema,
         HtmlTableSchema,
@@ -68,12 +71,12 @@
 
     // calls get and if type set, converts to it
     // making default values
-    function getWithType(obj, path, type, def, nullable) {
+    function getWithType(obj, path, type, def) {
         var value = get(obj, path);
 
         if (value === undefined) {
             if (type) {
-                value = Model.def(type, def, nullable !== false);
+                value = Model.def(type, def, true);
             }
         }
         else {
@@ -90,12 +93,12 @@
             this.data = data;
         },
 
-        read: function (params, success, error) {
-            return success(this.data);
+        read: function (params, success, error, extra) {
+            return success(this.data, false, extra);
         },
 
-        modify: function (changes, success, error) {
-            success();
+        modify: function (changes, success, error, extra) {
+            success(extra);
         }
     });
 
@@ -106,27 +109,27 @@
             this.cache = cache;
         },
 
-        read: function (params, success, error) {
+        read: function (params, success, error, extra) {
             var options = this.options,
                 readOptions = options.read,
                 cache = this.cache,
                 cached;
 
             if (is.func(readOptions)) {
-                readOptions(params, success, error);
+                readOptions(params, success, error, extra);
                 return;
             }
 
             readOptions = is.string(readOptions) ? {url: readOptions} : extend(true, {}, readOptions);
 
             if (is.func(readOptions.data)) {
-                params = readOptions.data(params);
+                params = readOptions.data(params, extra);
             }
 
             cached = cache.get(params);
 
             if (cached !== undefined) {
-                success(cached, true);
+                success(cached, true, extra);
             }
             else {
                 readOptions.data = params;
@@ -134,14 +137,14 @@
 
                 readOptions.success = function (result) {
                     cache.set(params, result);
-                    success(result);
+                    success(result, false, extra);
                 };
 
                 $.ajax(readOptions);
             }
         },
 
-        modify: function (changes, success, error) {
+        modify: function (changes, success, error, extra) {
             var options = this.options,
                 modifyOptions = options.modify || {},
                 optionFields = ["create", "update", "remove"],
@@ -155,7 +158,7 @@
                 getModelDataFunc = function (model) { return model.data; };
 
             if (is.func(modifyOptions)) {
-                modifyOptions(changes, success, error);
+                modifyOptions(changes, success, error, extra);
                 return;
             }
 
@@ -182,14 +185,15 @@
                     currentOptions(
                         changes[changesKey],
                         proxy(deferred.resolve, deferred),
-                        proxy(deferred.reject, deferred)
+                        proxy(deferred.reject, deferred),
+                        extra
                     );
                 }
                 else if (is.object(currentOptions)) {
                     currentOptions = extend(true, {}, currentOptions);
-                    
+
                     if (is.func(currentOptions.data)) {
-                        currentOptions.data = currentOptions.data(changes[changesKey]);
+                        currentOptions.data = currentOptions.data(changes[changesKey], extra);
                     }
                     else {
                         currentOptions.data = {};
@@ -266,6 +270,7 @@
             }
 
             if (is.array(expression)) {
+                // pass a copy of the expressions to the comparator function
                 return cache.get(expression) || cache.set(expression, (function (expression) {
                     return function (a, b) {
                         var expr,
@@ -301,7 +306,7 @@
                                 valB = valB.getTime();
                             }
 
-                            //treat null and undefined equal when sorting
+                            // treat null and undefined equal when sorting
                             if (valA === valB || (valA == null && valB == null)) {
                                 continue;
                             }
@@ -340,7 +345,7 @@
                         // this will preserve the position
                         return a.index - b.index;
                     };
-                })(expression));
+                })([].concat(expression))); // passing a copy of the expressions array
             }
         }
     });
@@ -1121,7 +1126,7 @@
                 // remote grouping
 
                 // NOTE: in remote grouping the grouped data returned from the server
-                // must also contain any server-side fildering applied too, so we 
+                // must also contain any server-side filtering applied too, so we 
                 // will not apply any filtering becuase it will mess up the 
                 // groups already returned from the server
 
@@ -1206,7 +1211,13 @@
 
             that.cache = new Cache();
 
+            that._recursive = !!options.resursive;
+
             Dispatcher.fn.init.call(that, options);
+        },
+
+        isRecursive: function() {
+            return this._recursive;
         },
 
         trigger: shield.ui.Widget.fn.trigger,
@@ -1256,30 +1267,33 @@
             return remote && remote.read ? remote.read.operations || remote.operations || [] : [];
         },
 
-        _success: function (deferred, params, result, fromCache) {
+        _success: function (deferred, params, result, fromCache, extra) {
             var that = this,
                 schema = that.schema,
                 processed = schema.process(result);
 
             that.data = processed.data;
+            that._pTotal = processed.total;
+            that._pAggregates = processed.aggregates;
+            that._pGroups = processed.groups;
 
-            that._createView(processed.data, params, processed.total, processed.aggregates, processed.groups);
- 
-            deferred.resolve(that.view, !!fromCache);
+            that._createView(processed.data, params);
 
             that.trigger(COMPLETE);
 
-            that.trigger(CHANGE, { fromCache: !!fromCache });
+            that.trigger(CHANGE, { fromCache: !!fromCache, extra: extra });
+
+            deferred.resolve(that.view, !!fromCache);
         },
 
-        _createView: function(data, params, total, aggregates, groups) {
+        _createView: function(data, params) {
             var that = this,
                 query = DataQuery.create(
                     data, 
                     extend({}, params || that._params().local, {remoteOperations: that._remoteOperations()}),
-                    total,
-                    aggregates,
-                    groups
+                    that._pTotal,
+                    that._pAggregates,
+                    that._pGroups
                 );
  
             that.view = query.data;
@@ -1288,7 +1302,7 @@
             that.aggregates = query.aggregates;
         },
 
-        _error: function (deferred, triggerComplete, operation, error) {
+        _error: function (deferred, triggerComplete, operation, error, extra) {
             var that = this;
 
             deferred.reject(error);
@@ -1297,14 +1311,14 @@
                 that.trigger(COMPLETE);
             }
 
-            that.trigger(ERROR, {errorType: "transport", error: error, operation: operation});
+            that.trigger(ERROR, {errorType: "transport", error: error, operation: operation, extra: extra});
         },
 
-        read: function () {
+        read: function (extra) {
             var that = this,
                 deferred = new Deferred(),
                 params = that._params(),
-                evt = that.trigger(START, { params: params });
+                evt = that.trigger(START, { params: params, extra: extra });
 
             if (!evt.isDefaultPrevented()) {
                 that.cancel();
@@ -1312,7 +1326,8 @@
                 that._client().read(
                     params.remote,
                     proxy(that._success, that, deferred, params.local),
-                    proxy(that._error, that, deferred, true, "read")
+                    proxy(that._error, that, deferred, true, "read"),
+                    extra
                 );
             }
             else {
@@ -1341,7 +1356,9 @@
                 model: that.schema.model,
                 events: {
                     change: function (e) {
-						// recreate the view
+                        // the tracker has changed - e.g. an item was inserted or removed
+
+                        // recreate the view
                         that._createView(that.data);
 
                         // if no event passed or an event with no afterset set, 
@@ -1363,6 +1380,11 @@
             });
 
             that.data = tracker.data;
+        },
+
+        // returns the data index given a view index
+        getDataIndex: function(index) {
+            return this._indices[index];
         },
 
         // add a new object at the end of the data array and return an editable model for it
@@ -1397,31 +1419,28 @@
 
         // insert a new object at the specified view index in the data array and return an editable model for it
         // NOTE: uses the index of the items in the view
-        insertView: function (index, obj) {            
-            this._ensureTracker();
+        insertView: function (index, obj) {
             // convert the index from view to data index
-            return this.tracker.insert(this._indices[index], obj);
+            return this.insert(this._indices[index], obj);
         },
 
         // remove an object from the data array at the specified view index
         // NOTE: uses the index of the items in the view
         removeAtView: function (index) {
-            this._ensureTracker();
             // convert the index from view to data index
-            return this.tracker.removeAt(this._indices[index]);
+            return this.removeAt(this._indices[index]);
         },
 
         // return an editable model for an object from the data array at the specified view index
         // NOTE: uses the index of the items in the view
         editView: function (index) {
-            this._ensureTracker();
             // convert the index from view to data index
-            return this.tracker.edit(this._indices[index]);
+            return this.edit(this._indices[index]);
         },
 
         // save any changes during editing to the local data array
         // will trigger the change event by default
-        save: function (triggerChange/*=true*/) {
+        save: function (triggerChange/*=true*/, extra) {
             var that = this,
                 tracker = that.tracker,
                 changes = tracker ? tracker.changes : {added: [], edited: [], removed: []},
@@ -1447,8 +1466,8 @@
                     data[i] = modified[i];
                 }
 
-                // synchronize the DS.data to DS.options.data  if the data is local
-                // if the DS.options.data is defined and is not a function
+                // synchronize the DS.data to DS.options.data if the data is local - 
+                // i.e. if the DS.options.data is defined and is not a function
                 if (that.options.data && !is.func(that.options.data)) {
                     deferred.done(proxy(that._syncLocalData, that));
                 }
@@ -1457,7 +1476,8 @@
                 that._client().modify(
                     changes,
                     proxy(deferred.resolve, deferred),
-                    proxy(that._error, that, deferred, false, "save")
+                    proxy(that._error, that, deferred, false, "save"),
+                    extra
                 );
 
                 // destroy the tracker
@@ -1473,7 +1493,7 @@
                 // after the modify operation is done
                 triggerChangeFunc = function() {
                     that._createView(that.data);
-                    that.trigger(CHANGE);
+                    that.trigger(CHANGE, {extra: extra});
                 };
                 deferred.then(triggerChangeFunc, triggerChangeFunc);
             }
@@ -1486,7 +1506,6 @@
                 schema = that.schema,
                 schemaFields = schema.options.fields,
                 data = that.data,
-                optionsData = that.options.data,
                 rawItems = [],
                 i,
                 // determine if the first item of the options.data list is a list or not
@@ -1536,7 +1555,9 @@
 
             that.cancel();
 
-            that.cache.clear();
+            if (that.cache) {
+                that.cache.clear();
+            }
 
             for (i = 0 ; i < props.length; i++) {
                 delete that[props[i]];
@@ -1548,7 +1569,17 @@
     DataSource.create = function (options, additionalOptions) {
         // create a DataSource instance from an existing instance or a configuration dictionary
         // additionalOptions will be merged with the configuration options only if they are both dicts
-        return options instanceof DataSource ? options : new DataSource(extend({}, options, additionalOptions));
+        if (options instanceof DataSource) {
+            return options;
+        }
+
+        if (is.array(options)) {
+            // case where data is passed directly as an array
+            return new DataSource(extend({data: options}, additionalOptions));
+        }
+        else {
+            return new DataSource(extend({}, options, additionalOptions));
+        }
     };
 
     // Schema class
@@ -1719,6 +1750,8 @@
 
             return {
                 data: projected,
+                aggregates: aggregates,
+                groups: groups,
                 total: that.total(parsed, projected)
             };
         }
@@ -1752,7 +1785,7 @@
 
                 if (value === undefined) {
                     if (field.type) {
-                        value = Model.def(field.type, field.def, field.nullable !== false);
+                        value = Model.def(field.type, field.def, field.nullable);
                     }
                 }
                 else {
@@ -1971,9 +2004,7 @@
 
 			// when the model throws on save - e.g. after its data has been set,
 			// trigger change for the tracker, passing afterset = true
-			model.on(AFTERSET, function() {
-				that.trigger(CHANGE, {afterset: true});
-			});
+            model.on(AFTERSET, proxy(that.trigger, that, CHANGE, {afterset: true}));
 
             return model;
         },
@@ -1987,7 +2018,7 @@
                 data = that.data,
                 changes = that.changes,
                 model;
-            
+
             if (index < 0 || index > data.length) {
                 throw new Error("shield.DataSource: invalid item index.");
             }
@@ -1995,10 +2026,10 @@
             model = that._model(obj);
 
             changes.added.push(model);
-            
+
             data.splice(index, 0, model.data);
-            
-            that.trigger(CHANGE, {operation: "add", index: index, model: model});
+
+            that.trigger(CHANGE, {operation: INSERT, index: index, model: model});
 
             return model;
         },
@@ -2008,7 +2039,7 @@
                 data = that.data,
                 changes = that.changes,
                 model;
-            
+
             if (isNaN(index) || index < 0 || index >= data.length) {
                 throw new Error("shield.DataSource: invalid item index.");
             }
@@ -2018,7 +2049,7 @@
             if (model) {
                 return model;
             }
-                        
+
             model = that._model(data[index]);
 
             changes.edited.push(model);
@@ -2069,7 +2100,7 @@
                         
             data.splice(index, 1);
 
-            that.trigger(CHANGE, {operation: "remove", index: index, model: model});
+            that.trigger(CHANGE, {operation: REMOVE, index: index, model: model});
 
             return model;
         },
@@ -2086,9 +2117,8 @@
             }
 
             changes.added.length = changes.edited.length = changes.removed.length = 0;
-            
-            that.data = null;
-            that.original = null;
+
+            that.data = that.original = null;
 
             Dispatcher.fn.destroy.call(that);
         }
@@ -2229,7 +2259,7 @@
             return 0;
         }
         if (type === Date) {
-            return null;
+            return new Date();
         }
         if (type === Boolean) {
             return false;
@@ -2324,9 +2354,19 @@
         }
     };
 
+    RecursiveDataSource = DataSource.extend({
+        init: function(options) {
+            extend(options, {
+                resursive: true
+            });
+            DataSource.fn.init.call(this, options);
+        }
+    });
+
     extend(shield, {
         map: map,
         DataSource: DataSource,
+        RecursiveDataSource: RecursiveDataSource,
         DataQuery: DataQuery,
         Model: Model
     });

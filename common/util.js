@@ -1,13 +1,13 @@
 (function ($, shield, win, UNDEFINED) {
-    "use strict";
+    //"use strict";
 
     // some variables global for the closure
     var Widget = shield.ui.Widget,
 		Class = shield.Class,
-
         keyCode = shield.Constants.KeyCode,
-        doc = document,
+        error = shield.error,
 
+        doc = document,
         mathAbs = Math.abs,
         mathMin = Math.min,
         mathMax = Math.max,
@@ -23,6 +23,9 @@
         isFunction = shield.is.func,
         isNumber = shield.is.number,
         isObject = shield.is.object,
+        isNull = shield.is["null"],
+        isString = shield.is.string,
+        isArray = shield.is.array,
         toInt = shield.to["int"],
         toNumber = shield.to.number,
         toString = shield.to.string,
@@ -43,6 +46,7 @@
         RESIZE = "resize",
         RESIZED = "resized",
         DRAG = "drag",
+        DROP = "drop",
         CANCEL = "cancel",
         DISABLED = "disabled",
         PX = "px",
@@ -69,6 +73,10 @@
 		MARGINTOP = "marginTop",
 		MARGINBOTTOM = "marginBottom",
 		FLIP = "flip",
+        POINTER = "pointer",
+        FIT = "fit",
+        INTERSECT = "intersect",
+        TOUCH = "touch",
 
         SUI_RESIZABLE_CLS = "sui-resizable",
         SUI_RESIZABLE_DISABLED_CLS = SUI_RESIZABLE_CLS + "-" + DISABLED,
@@ -76,11 +84,16 @@
         SUI_DRAGGABLE_DISABLED_CLS = SUI_DRAGGABLE_CLS + "-" + DISABLED,
         SUI_DRAGGABLE_DRAGGING_CLS = SUI_DRAGGABLE_CLS + "-dragging",
         SUI_UNSELECTABLE_CLS = "sui-unselectable",
+        SUI_DROPPABLE_CLS = "sui-droppable",
+        SUI_DROPPABLE_DISABLED_CLS = SUI_DROPPABLE_CLS + "-" + DISABLED,
+        SUI_DROPPABLE_HOVER_CLS = SUI_DROPPABLE_CLS + "-over",
 
         MouseTracker, mouseTrackerInstance, mouseTrackerInstances = 0,
         Util,
         Position, Overflow,
+        DDManager,
         Draggable, draggableDefaults,
+        Droppable, droppableDefaults,
         Resizable, resizableDefaults;
 
 
@@ -135,7 +148,7 @@
 			element: withinElement,
 			isWindow: isWindowElement,
 			isDocument: isDocument,
-			offset: withinElement.offset() || { left: 0, top: 0 },
+			offset: isWindowElement ? {left: 0, top: 0} : (withinElement.offset() || {left: 0, top: 0}),
 			scrollLeft: withinElement.scrollLeft(),
 			scrollTop: withinElement.scrollTop(),
 			width: isWindowElement || isDocument ? withinElement.width() : withinElement.outerWidth(),
@@ -200,10 +213,23 @@
         return max;
     }
 
+    function getCoordinates(e) {
+        return (e.pageX || e.pageY) ?
+            {
+                x: e.pageX,
+                y: e.pageY
+            } :
+            {
+                x: (e.clientX + doc.body.scrollLeft - doc.body.clientLeft),
+                y: (e.clientY + doc.body.scrollTop  - doc.body.clientTop)
+            };
+    }
+
     // A utility namespace
     Util = {};
     Util.GetWithinInfo = getWithinInfo;
     Util.GetMaxZIndex = getMaxZIndex;
+    Util.GetCoordinates = getCoordinates;
     shield.ui.Util = Util;
 
 
@@ -233,15 +259,7 @@
         },
 
         getPosFromEvent: function(e) {
-            return (e.pageX || e.pageY) ?
-                {
-                    x: e.pageX,
-                    y: e.pageY
-                } :
-                {
-                    x: (e.clientX + doc.body.scrollLeft - doc.body.clientLeft),
-                    y: (e.clientY + doc.body.scrollTop  - doc.body.clientTop)
-                };
+            return getCoordinates(e);
         },
 
         getPosition: function(e) {
@@ -283,8 +301,6 @@
 
 
     // Position utility class
-    // NOTE: this code is based on the jQuery UI position widget (http://api.jqueryui.com/position/), 
-    // released under the MIT license (http://jquery.org/license)
     Position = {};
     Position.Set = function(element, eltarget, setOptions) {
 		//if invalid argument - throw exception
@@ -464,11 +480,11 @@
 						vertical: bottom < 0 ? TOP : top > 0 ? BOTTOM : MIDDLE
 					};
 
-				if (targetWidth < elemWidth && mathAbs(left + right) < targetWidth) {
+				if (targetWidth <= elemWidth && mathAbs(left + right) <= targetWidth) {
 					feedback.horizontal = CENTER;
 				}
 
-				if (targetHeight < elemHeight && mathAbs(top + bottom) < targetHeight) {
+				if (targetHeight <= elemHeight && mathAbs(top + bottom) <= targetHeight) {
 					feedback.vertical = MIDDLE;
 				}
 
@@ -674,6 +690,7 @@
     resizableDefaults = {
         enabled: true,
         cls: UNDEFINED, // an optional class to add to the element
+        iframeFix: false,       // place divs over any iframes that will catch the mousemove events
         resizeCls: UNDEFINED,   // an optional class to add while being resized
         delta: 1,    // minimum distance for which to start resizing
         handles: ["e", "w", "n", "s", "se", "sw", "ne", "nw"],  // which handles (directions) to resize to
@@ -699,10 +716,18 @@
 			// call the parent init
             Widget.fn.init.apply(this, arguments);
 
+            // NOTE: hack the options.handles, because the jQuery.exend
+            // will merge the list instead of replacing it
+            if (isDefined(this.initialOptions.handles)) {
+                this.options.handles = this.initialOptions.handles;
+            }
+
 			var self = this,
                 element = $(self.element),
                 options = self.options,
                 cls = options.cls;
+
+            self._eventNS = ".shieldResizable" + self.getInstanceId();
 
             // init the mouse tracker
             self.mouseTracker = new MouseTracker();
@@ -824,8 +849,9 @@
             }
 
             // init global document mouseup and mousemove events
-            $(doc).on(MOUSEUP + ".shieldResizable" + self.getInstanceId(), proxy(self._handleMouseUp, self));
-            $(doc).on(MOUSEMOVE + ".shieldResizable" + self.getInstanceId(), proxy(self._handleMouseMove, self));
+            $(doc)
+                .on(MOUSEUP + self._eventNS, proxy(self._handleMouseUp, self))
+                .on(MOUSEMOVE + self._eventNS, proxy(self._handleMouseMove, self));
         },
 
         _destroyHandles: function() {
@@ -834,8 +860,7 @@
                 i;
 
             // clear the global mouseup and mousemove events on the doc
-            $(doc).off(MOUSEUP + ".shieldResizable" + self.getInstanceId());
-            $(doc).off(MOUSEMOVE + ".shieldResizable" + self.getInstanceId());
+            $(doc).off(self._eventNS);
 
             // destroy each handle
             for (i=0; i<handles.length; i++) {
@@ -845,6 +870,35 @@
             }
 
             self.handles = [];
+        },
+
+        _fixIframes: function() {
+            var self = this,
+                iframeFix = self.options.iframeFix,
+                selector;
+
+            if (iframeFix) {
+                selector = iframeFix === true ? "iframe" : iframeFix;
+                self._fixedFrames = $(doc.body).find(selector).map(function() {
+                    var iframe = $(this);
+
+                    return $('<div/>')
+                        .css(POSITION, ABSOLUTE)
+                        .appendTo(iframe.parent())
+                        .outerWidth(iframe.outerWidth())
+                        .outerHeight(iframe.outerHeight())
+                        .offset(iframe.offset())[0];
+                });
+            }
+        },
+
+        _unfixIframes: function() {
+            var self = this;
+
+            if (self._fixedFrames) {
+                $(self._fixedFrames).remove();
+                delete self._fixedFrames;
+            }
         },
 
         _handleMouseDown: function(handleIndex, event) {
@@ -862,6 +916,8 @@
 
             // add the unselectable class
             $(self.element).addClass(SUI_UNSELECTABLE_CLS);
+
+            self._fixIframes();
         },
 
         _handleMouseMove: function(event) {
@@ -1096,6 +1152,8 @@
                 triggerStop = !!self.startSent,
                 resizeCls = self.options.resizeCls;
 
+            self._unfixIframes();
+
             if (!self.resizing) {
                 return;
             }
@@ -1130,7 +1188,7 @@
                 .height(height);
         },
 
-		// setter/getter for the enabled state
+		// setter/getter for the Resizable enabled state
 		enabled: function() {
 			var self = this,
 				element = $(self.element),
@@ -1178,11 +1236,246 @@
     shield.ui.plugin("Resizable", Resizable);
 
 
+    // DDManager - drag & drop manager static class
+    DDManager = {
+        droppables: { "default": [] },
+
+        Register: function(droppable) {
+            var scope = droppable.options.scope;
+
+            DDManager.droppables[scope] = DDManager.droppables[scope] || [];
+            DDManager.droppables[scope].push(droppable);
+        },
+
+        UnRegister: function(droppable) {
+            var scope = droppable.options.scope,
+                droppables = DDManager.droppables[scope],
+                i;
+
+            for (i=0; i<droppables.length; i++) {
+                if (droppables[i] === droppable) {
+                    droppables.splice(i, 1);
+                }
+            }
+        },
+
+        PrepareOffsets: function(draggable, event) {
+            var droppables = DDManager.droppables[draggable.options.scope] || [],
+                draggableHelper = $(draggable.helper || draggable.element),
+                enabled,
+                visible,
+                i,
+                j;
+
+            for (i=0; i<droppables.length; i++) {
+                enabled = droppables[i].enabled();
+                visible = droppables[i].visible();
+
+                droppables[i].ddIsEnabled = enabled;
+                droppables[i].ddIsVisible = visible;
+
+                if (!enabled || !visible || (draggable && !droppables[i].accepts(draggable.element)) || (draggable && draggable.element.get(0) === droppables[i].element.get(0))) {
+                    continue;
+                }
+
+                droppables[i].ddOffset = droppables[i].element.offset();
+			    droppables[i].proportions({
+                    width: droppables[i].element[0].offsetWidth,
+                    height: droppables[i].element[0].offsetHeight
+                });
+            }
+
+            draggable.proportions({
+                width: draggableHelper[0].offsetWidth,
+                height: draggableHelper[0].offsetHeight
+            });
+        },
+
+        DragStart: function(draggable, event) {
+            DDManager.PrepareOffsets(draggable, event);
+        },
+
+        // NOTE: not used at the moment
+        //DragStop: function(draggable, event) {},
+
+        // called from the Draggable widget when an item is being dragged
+        Drag: function(draggable, event) {
+            var droppables = DDManager.droppables[draggable.options.scope] || [],
+                droppablesLen = droppables.length,
+                intersects,
+                i;
+
+            for (i=0; i<droppablesLen; i++) {
+                if (!droppables[i].ddIsEnabled || !droppables[i].ddIsVisible || (draggable && !droppables[i].accepts(draggable.element)) || (draggable && draggable.element.get(0) === droppables[i].element.get(0))) {
+                    continue;
+                }
+
+                intersects = DDManager.Intersects(draggable, droppables[i], event);
+
+                if (intersects) {
+                    if (!droppables[i].ddIsOver) {
+                        droppables[i].ddIsOver = true;
+                        droppables[i].over(draggable, event);
+                    }
+                }
+                else {
+                    if (droppables[i].ddIsOver) {
+                        droppables[i].ddIsOver = false;
+                        droppables[i].out(draggable, event);
+                    }
+                }
+            }
+        },
+
+        // called from the Draggable widget when an item is dropped (before Draggable stop event is called)
+        Drop: function(draggable, event) {
+            var droppables = DDManager.droppables[draggable.options.scope] || [],
+                droppablesLen = droppables.length,
+                intersects,
+                i,
+                cancelled,
+                skipAnimation,
+                evt;
+
+            for (i=0; i<droppablesLen; i++) {
+                if (!droppables[i].ddIsEnabled || !droppables[i].ddIsVisible || (draggable && !droppables[i].accepts(draggable.element)) || (draggable && draggable.element.get(0) === droppables[i].element.get(0))) {
+                    continue;
+                }
+
+                droppables[i].stop();
+
+                intersects = DDManager.Intersects(draggable, droppables[i], event);
+
+                droppables[i].ddIsOver = false;
+
+                if (intersects) {
+                    evt = droppables[i].drop(draggable, event);
+                    if (evt.isDefaultPrevented()) {
+                        cancelled = true;
+                    }
+                    if (evt.skipAnimation) {
+                        skipAnimation = true;
+                    }
+                }
+            }
+
+            return {
+                cancelled: cancelled,
+                skipAnimation: skipAnimation
+            };
+        },
+
+        Intersects: function(draggable, droppable, event) {
+            var tolerance = droppable.options.tolerance,
+                toleranceX = isObject(tolerance) ? tolerance.x : tolerance,
+                toleranceY = isObject(tolerance) ? tolerance.y : tolerance,
+                proportions = droppable.proportions(),
+                offset = droppable.ddOffset,
+                width = proportions.width,
+                height = proportions.height,
+                left = offset.left,
+                top = offset.top,
+                intersectsX,
+                intersectsY,
+                draggableProportions,
+                draggableWidth,
+                draggableHeight,
+                draggableOffset,
+                draggableLeft,
+                draggableTop,
+                pos;
+
+            // check intersectsX
+            if (toleranceX == POINTER) {
+                var mt = new MouseTracker();
+                pos = mt.getPosition(event);
+                mt.destroy();
+
+                intersectsX = left <= pos.x && (left + width) >= pos.x;
+            }
+            else {
+                draggableProportions = draggable.proportions();
+                draggableWidth = draggableProportions.width;
+                draggableHeight = draggableProportions.height;
+                draggableOffset = $(draggable.helper || draggable.element).offset();
+                draggableLeft = draggableOffset.left;
+                draggableTop = draggableOffset.top;
+
+                if (toleranceX == FIT) {
+                    intersectsX = DDManager._linesOverlap(draggableLeft, draggableLeft + draggableWidth, left, left + width, draggableWidth);
+                }
+                else if (toleranceX == INTERSECT) {
+                    intersectsX = DDManager._linesOverlap(draggableLeft, draggableLeft + draggableWidth, left, left + width, draggableWidth/2);
+                }
+                else { // touch
+                    intersectsX = DDManager._linesOverlap(draggableLeft, draggableLeft + draggableWidth, left, left + width, 0);
+                }
+            }
+
+            if (!intersectsX) {
+                return false;
+            }
+
+            // check intersectsY
+            if (toleranceY == POINTER) {
+                if (!pos) {
+                    var mt2 = new MouseTracker();
+                    pos = mt2.getPosition(event);
+                    mt2.destroy();
+                }
+
+                intersectsY = top <= pos.y && (top + height) >= pos.y;
+            }
+            else {
+                if (!draggableProportions) {
+                    draggableProportions = draggable.proportions();
+                    draggableWidth = draggableProportions.width;
+                    draggableHeight = draggableProportions.height;
+                    draggableOffset = $(draggable.helper || draggable.element).offset();
+                    draggableLeft = draggableOffset.left;
+                    draggableTop = draggableOffset.top;
+                }
+
+                if (toleranceY == FIT) {
+                    intersectsY = DDManager._linesOverlap(draggableTop, draggableTop + draggableHeight, top, top + height, draggableHeight);
+                }
+                else if (toleranceY == INTERSECT) {
+                    intersectsY = DDManager._linesOverlap(draggableTop, draggableTop + draggableHeight, top, top + height, draggableHeight/2);
+                }
+                else { // touch
+                    intersectsY = DDManager._linesOverlap(draggableTop, draggableTop + draggableHeight, top, top + height, 0);
+                }
+            }
+
+            return intersectsX && intersectsY;
+        },
+
+        _linesOverlap: function(firstStart, firstEnd, secondStart, secondEnd, min) {
+            if (!isDefined(min)) {
+                min = 0;
+            }
+
+            if (firstStart < secondStart && firstEnd < secondEnd) {
+                return firstEnd - secondStart > min;
+            }
+            else if (firstStart > secondStart && firstEnd > secondEnd) {
+                return secondEnd - firstStart > min;
+            }
+            else {
+                return true;
+            }
+        }
+    };
+    shield.ui.DDManager = DDManager;
+
+
     // Draggable widget default settings
     draggableDefaults = {
         enabled: true,
+        iframeFix: false,       // place divs over any iframes that will catch the mousemove events
         cls: UNDEFINED,         // an optional class to add to the element
-        dragCls: UNDEFINED,     // an optional class to add while being dragged        
+        dragCls: UNDEFINED,     // an optional class to add while being dragged
+        scope: "default",       // for grouping draggable and droppable items
         handle: UNDEFINED,      // an optional handle to drag the element from
 		direction: UNDEFINED,   // horizontal or vertical
 		min: UNDEFINED,         // if direction defined
@@ -1192,12 +1485,19 @@
         stack: true,            // adjusts the zIndex of the element being dragged - false, true (means to parent) or if string or jquery el - relative to it
         helper: UNDEFINED,      // a string or function for a helper element to be shown when dragged (instead of moving the original underlying element)
         // UNDEFINED means original will be moved; "clone" means a jQuery.clone() will be made; function(params); and HTML or selector string are supported
+        appendTo: "parent",     // a string (parent|body|jquery-selector) identifying the element to add the helper to, if not part of the body
+        animation: {
+            enabled: true,
+            revertDuration: 200
+        },
         events: {
             // start
             // drag
             // stop
         }
     };
+    // public methods:
+    //      bool enabled() / void enabled(bool)
     // Draggable class
     Draggable = Widget.extend({
         init: function () {
@@ -1209,6 +1509,8 @@
                 options = self.options,
                 cls = options.cls,
                 cssPosition;
+
+            self._eventNS = ".shieldDraggable" + self.getInstanceId();
 
             // init the mouse tracker
             self.mouseTracker = new MouseTracker();
@@ -1229,30 +1531,87 @@
             self.startSent = false;
         },
 
+        proportions: function() {
+            var self = this;
+
+            if (arguments.length > 0) {
+                self._proportions = arguments[0];
+            }
+            else {
+                return self._proportions ? self._proportions : self._proportions = {
+                    width: self.element[0].offsetWidth,
+                    height: self.element[0].offsetHeight
+                };
+            }
+        },
+
+        _fixIframes: function() {
+            var self = this,
+                iframeFix = self.options.iframeFix,
+                selector;
+
+            if (iframeFix) {
+                selector = iframeFix === true ? "iframe" : iframeFix;
+                self._fixedFrames = $(doc.body).find(selector).map(function() {
+                    var iframe = $(this);
+
+                    return $('<div/>')
+                        .css(POSITION, ABSOLUTE)
+                        .appendTo(iframe.parent())
+                        .outerWidth(iframe.outerWidth())
+                        .outerHeight(iframe.outerHeight())
+                        .offset(iframe.offset())[0];
+                });
+            }
+        },
+
+        _unfixIframes: function() {
+            var self = this;
+
+            if (self._fixedFrames) {
+                $(self._fixedFrames).remove();
+                delete self._fixedFrames;
+            }
+        },
+
         _handleMouseDown: function(event) {
             var self = this,
-                element = self.element,
-                options = self.options,
-                helperOption = options.helper,
-                cls = options.cls,
-                dragCls = options.dragCls,
-                helper;
+                eventNS = self._eventNS;
 
             if (!self._enabled || self._dragging) {
                 return;
             }
 
+            $(doc.body).addClass(SUI_UNSELECTABLE_CLS);
+
             self._dragging = true;
             self.startSent = false;
-			self._helper = self._isCustomHelper = null;
+			self.helper = self._isCustomHelper = null;
 
             // save the current mouse position
             self.stepPosition = self.mousePos = self.mouseTracker.getPosition(event);
 
             // add mousemove, mouseup and keydown handlers
-            $(doc).on(MOUSEMOVE + ".shieldDraggable" + self.getInstanceId(), proxy(self._handleMouseMove, self))
-                .on(MOUSEUP + ".shieldDraggable" + self.getInstanceId(), proxy(self._handleMouseUp, self))
-                .on(KEYDOWN + ".shieldDraggable" + self.getInstanceId(), proxy(self._handleKeyDown, self));
+            $(doc).on(MOUSEMOVE + eventNS, proxy(self._handleMouseMove, self))
+                .on(MOUSEUP + eventNS, proxy(self._handleMouseUp, self))
+                .on(KEYDOWN + eventNS, proxy(self._handleKeyDown, self));
+
+            self._fixIframes();
+        },
+
+        _initHelper: function(event) {
+            var self = this,
+                element = self.element,
+                options = self.options,
+                helperOption = options.helper,
+                appendTo = options.appendTo,
+                cls = options.cls,
+                dragCls = options.dragCls,
+                helper;
+
+            if (self._helperInitialized) {
+                return;
+            }
 
             // init the helper - the element being dragged
             if (helperOption && helperOption !== "original") {
@@ -1268,7 +1627,15 @@
 
                 // make sure the helper is in the body
                 if (!helper.parents("body").length) {
-                    element.after(helper);
+                    if (appendTo === "parent") {
+                        element.after(helper);
+                    }
+                    else if (appendTo && appendTo !== "body") {
+                        helper.appendTo($(appendTo));
+                    }
+                    else {
+                        helper.appendTo(doc.body);
+                    }
                 }
 
                 // make sure position is absolute or fixed
@@ -1289,7 +1656,7 @@
                 helper = element;
                 self._isCustomHelper = false;
             }
-            self._helper = helper;
+            self.helper = helper;
 
             // add dragging classes to the helper
             helper.addClass(
@@ -1303,13 +1670,12 @@
                 left: parseCssInt(helper, LEFT),
                 top: parseCssInt(helper, TOP)
             };
+
+            self._helperInitialized = true;
         },
 
         _handleMouseMove: function(event) {
             var self = this,
-                helper = $(self._helper),
-                helperWidth = helper.width(),
-                helperHeight = helper.height(),
                 options = self.options,
                 step = options.step,
                 calculatedStep,
@@ -1327,14 +1693,25 @@
                 leftPos, 
                 topPos,
 				deltaX, 
-                deltaY;
+                deltaY,
+                helper,
+                helperWidth,
+                helperHeight;
 
             // do not do anything if the mouse is not over the window
             if (!mouseTracker.isInWindow(event)) {
                 return;
             }
-			
+
             if (self._dragging) {
+                // make sure the helper is initialized
+                self._initHelper(event);
+
+                // get some helper info
+                helper = $(self.helper);
+                helperWidth = helper.width();
+                helperHeight = helper.height();
+
                 // get the top and left position of the helper
                 cssTop = parseCssInt(helper, TOP);
                 cssLeft = parseCssInt(helper, LEFT);
@@ -1480,32 +1857,53 @@
 
                     // adjust the zIndex if needed - only once per drag
                     self._adjustZIndex();
+
+                    // inform the drag manager about the starting of the drag
+                    DDManager.DragStart(self, event);
                 }
 
                 self.trigger(DRAG, {deltaX: deltaX, deltaY: deltaY, element: helper, domEvent: event});
+
+                // inform the drag manager about the dragging
+                DDManager.Drag(self, event);
             }
         },
-		
+
         _handleMouseUp: function(event) {
             var self = this,
                 element = self.element,
-                helper = self._helper,
-                evt;
+                helper = self.helper,
+                animation = self.options.animation,
+                evt,
+                dropResult,
+                cancelled,
+                skipAnimation;
+
+            self._unfixIframes();
+
+            $(doc.body).removeClass(SUI_UNSELECTABLE_CLS);
 
             if (self._dragging) {
                 // fire stop event if start was fired
                 // (this means element was dragged)
                 if (self.startSent) {
-                    evt = self.trigger(STOP, {left: parseCssInt(helper, LEFT), top: parseCssInt(helper, TOP), element: helper, domEvent: event});
-                    if (evt.isDefaultPrevented()) {
-                        // if the event is prevented, revert the element 
-                        // to the original position if it is not a custom handle
-                        if (!self._isCustomHelper) {
-                            helper.css({                            
-                                left: self.oriPosition.left,
-                                top: self.oriPosition.top
-                            });
-                        }
+                    // send dropped - it will return True if at least one droppable prevented the event
+                    dropResult = DDManager.Drop(self, event);
+                    cancelled = dropResult.cancelled;
+                    skipAnimation = dropResult.skipAnimation;
+
+                    // send stop event
+                    evt = self.trigger(STOP, {left: parseCssInt(helper, LEFT), top: parseCssInt(helper, TOP), element: helper, domEvent: event, cancelled: cancelled, skipAnimation: skipAnimation});
+
+                    skipAnimation = evt.skipAnimation;
+                    cancelled = evt.cancelled;
+
+                    if (cancelled === true || evt.isDefaultPrevented()) {
+                        // if the event is prevented, revert the element to the original position
+                        $(helper).animate({
+                            left: self.oriPosition.left,
+                            top: self.oriPosition.top
+                        }, (!skipAnimation && animation && animation.enabled) ? animation.revertDuration : 0, proxy(self._endDrag, self));                        
                     }
                     else {
                         // event is not prevented - if helper is custom, move
@@ -1519,10 +1917,13 @@
                             // adjust the z-index of the element
                             self._adjustZIndex(element);
                         }
+
+                        self._endDrag();
                     }
                 }
-
-                self._endDrag();
+                else {
+                    self._endDrag();
+                }
             }
         },
 
@@ -1535,7 +1936,7 @@
             }
 
             if (!isDefined(element)) {
-                element = self._helper;
+                element = self.helper;
             }
 
             $(element).css('z-index', (stack === true ? getMaxZIndex("." + SUI_DRAGGABLE_CLS) : getMaxZIndex(stack)) + 1);
@@ -1549,12 +1950,14 @@
                 case keyCode.ESC: {
                     if (self._dragging) {
                         // restore the original position
-                        self._helper.css({                            
+                        self.helper.css({                            
                             left: self.oriPosition.left + PX,
                             top: self.oriPosition.top + PX
                         });
 
                         self.trigger(CANCEL);
+
+                        self._unfixIframes();
 
                         self._endDrag();
                     }
@@ -1571,22 +1974,20 @@
 
             if (self._isCustomHelper) {
                 // remove the helper if different from element
-                $(self._helper).remove();
+                $(self.helper).remove();
             }
             else {
                 // handle is the underlying element, so just remove the dragging classes
-                $(self._helper).removeClass(SUI_UNSELECTABLE_CLS + " " + SUI_DRAGGABLE_DRAGGING_CLS + (dragCls ? (" " + dragCls) : ""));
+                $(self.helper).removeClass(SUI_UNSELECTABLE_CLS + " " + SUI_DRAGGABLE_DRAGGING_CLS + (dragCls ? (" " + dragCls) : ""));
             }
 
             // remove handlers
-            $(doc).off(MOUSEMOVE + ".shieldDraggable" + self.getInstanceId())
-                .off(MOUSEUP + ".shieldDraggable" + self.getInstanceId())
-                .off(KEYDOWN + ".shieldDraggable" + self.getInstanceId());
+            $(doc).off(self._eventNS);
 
-            self.mousePos = self.oriPosition = self._helper = self._isCustomHelper = null;
+            self.mousePos = self.oriPosition = self.helper = self._isCustomHelper = self._helperInitialized = null;
         },
 
-        // setter/getter for the enabled state
+        // setter/getter for the Draggable enabled state
         enabled: function () {
             var self = this,
 				element = $(self.element),
@@ -1632,9 +2033,11 @@
                 cls = self.options.cls;
 
             // destroy the mouse tracker
-            self.mouseTracker.destroy();
-            self.mouseTracker = null;
-			
+            if (self.mouseTracker) {
+                self.mouseTracker.destroy();
+                self.mouseTracker = null;
+            }
+
             // remove added classes
             $(self.element).removeClass(SUI_DRAGGABLE_CLS + (cls ? (" " + cls) : ""));
 
@@ -1648,5 +2051,152 @@
     });
     Draggable.defaults = draggableDefaults;
     shield.ui.plugin("Draggable", Draggable);
+
+
+    // Droppable widget default settings
+    droppableDefaults = {
+        enabled: true,
+        accepts: "*",           // element, jQuery, String to describe the elements that can be dropped inside (REQUIRED)
+        cls: UNDEFINED,         // an optional class to add to the element
+        hoverCls: UNDEFINED,    // an optional class to add to the target while an acceptable element is dragged inside it
+        tolerance: "intersect", // fit, intersect, pointer, touch - the mode for testing whether a draggable element is over the droppable
+        scope: "default",       // for grouping draggable and droppable items
+        events: {
+            // over
+            // out
+            // drop
+        }
+    };
+    // public methods
+    //      bool enabled() / void enabled(bool)
+    // Droppable class
+    Droppable = Widget.extend({
+        init: function () {
+            Widget.fn.init.apply(this, arguments);
+
+            var self = this,
+                element = $(self.element),
+                options = self.options,
+                dieOnError = options.dieOnError,
+                accepts = options.accepts,
+                cls = options.cls;
+
+            // check the accepts option
+            if (!isString(accepts) && !isArray(accepts) && !(accepts instanceof $) && !isFunction(accepts)) {
+                error("shieldDroppable: The accepts option must be a string, array, function or jQuery object.", dieOnError);
+				return;
+            }
+
+            // generate an instance-unique event namespace
+            self._eventNS = ".shieldDroppable" + self.getInstanceId();
+
+            element.addClass(SUI_DROPPABLE_CLS + (cls ? (' ' + cls) : ''));
+
+            // add the draggable to the Drag Drop Manager
+            DDManager.Register(self);
+
+            // initialize the disabled state
+			self.enabled(options.enabled);
+        },
+
+        accepts: function(draggableElement) {
+            var accepts = this.options.accepts;
+
+            if (isFunction(accepts)) {
+                return accepts.call(this, draggableElement);
+            }
+            else {
+                return $(draggableElement).is(accepts);
+            }
+        },
+
+        proportions: function() {
+            var self = this;
+
+            if (arguments.length > 0) {
+                self._proportions = arguments[0];
+            }
+            else {
+                return self._proportions ? self._proportions : self._proportions = {
+                    width: self.element[0].offsetWidth,
+                    height: self.element[0].offsetHeight
+                };
+            }
+        },
+
+        over: function(draggable, event) {
+            var self = this,
+                hoverCls = self.options.hoverCls,
+                evt = self.trigger("over", {draggable: draggable.element, droppable: this.element, domEvent: event});
+
+            if (!evt.isDefaultPrevented()) {
+                $(self.element).addClass(SUI_DROPPABLE_HOVER_CLS + (hoverCls ? (' ' + hoverCls) : ''));
+            }
+        },
+
+        out: function(draggable, event) {
+            var self = this,
+                hoverCls = self.options.hoverCls;
+
+            self.trigger("out", {draggable: draggable.element, droppable: this.element, domEvent: event});
+            $(self.element).removeClass(SUI_DROPPABLE_HOVER_CLS + (hoverCls ? (' ' + hoverCls) : ''));
+        },
+
+        stop: function() {
+            var hoverCls = this.options.hoverCls;
+            $(this.element).removeClass(SUI_DROPPABLE_HOVER_CLS + (hoverCls ? (' ' + hoverCls) : ''));
+        },
+
+        drop: function(draggable, event) {
+            return this.trigger(DROP, {
+                draggable: draggable.element,
+                droppable: this.element,
+                cancelled: event.cancelled,                
+                skipAnimation: event.skipAnimation,
+                domEvent: event
+            });
+        },
+
+        // setter/getter for the Droppable enabled state
+        enabled: function () {
+            var self = this,
+                args = [].slice.call(arguments),
+				bEnabled;
+
+            if (args.length > 0) {
+                // setter
+                bEnabled = !!args[0];
+
+                if (bEnabled) {
+                    $(self.element).removeClass(SUI_DROPPABLE_DISABLED_CLS);
+                }
+                else {
+                    $(self.element).addClass(SUI_DROPPABLE_DISABLED_CLS);
+                }
+
+                self._enabled = bEnabled;
+            }
+            else {
+                // getter
+                return self._enabled;
+            }
+        },
+
+        destroy: function() {
+            var self = this,
+                cls = self.options.cls;
+
+            DDManager.UnRegister(self);
+
+            // remove added classes
+            $(self.element).removeClass(SUI_DROPPABLE_CLS + SUI_DROPPABLE_DISABLED_CLS + SUI_UNSELECTABLE_CLS + (cls ? (' ' + cls) : ''));
+
+            self._enabled = self._proportions = UNDEFINED;
+
+            Widget.fn.destroy.call(self);
+        }
+    });
+    Droppable.defaults = droppableDefaults;
+    shield.ui.plugin("Droppable", Droppable);
 
 })(jQuery, shield, this);

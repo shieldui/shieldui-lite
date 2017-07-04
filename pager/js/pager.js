@@ -1,5 +1,5 @@
 (function ($, shield, win, UNDEFINED) {
-    "use strict";
+    //"use strict";
 
     // some variables global for the closure
     var Widget = shield.ui.Widget,
@@ -8,7 +8,7 @@
 		doc = document,
         is = shield.is,
 		get = shield.get,
-        format = shield.format,
+        shieldFormat = shield.format,
         toInt = shield.to["int"],
         abs = Math.abs,
         each = $.each,
@@ -38,6 +38,7 @@
         boundaryLinks: true,
         imageLinks: false,
         messages: {
+            pageLabelTemplate: "{0}",
             infoBarTemplate: "{0} - {1} of {2} items",
             previousText: "&lsaquo;",
             nextText: "&rsaquo;",
@@ -58,8 +59,7 @@
 
             var self = this,
 				options = self.options,
-                dataSource,
-                changeDelegate;
+                dataSource;
 
             self.currentPage = options.currentPage;
 
@@ -74,9 +74,8 @@
 
             if (options.dataSource) {
                 dataSource = self.dataSource = DataSource.create(options.dataSource);
-                changeDelegate = self._changeDelegate = proxy(self._dataChange, self);
 
-                dataSource.on("change", changeDelegate);
+                dataSource.on("change.shieldPager" + self.getInstanceId(), proxy(self._dataChange, self));
 
                 self._updateDataSource();
             }
@@ -90,8 +89,7 @@
             var self = this;
 
             if (self.dataSource) {
-                self.dataSource.off("change", self._changeDelegate);
-                self._changeDelegate = null;
+                self.dataSource.off("change.shieldPager" + self.getInstanceId());
             }
 
             self.pagination = null;
@@ -115,6 +113,7 @@
                 options = self.options;
 
             e.preventDefault();
+
             if (!target.parent().hasClass(DISABLED)) {
                 var currentPage = toInt(target.attr("data-page"));
                 self.currentPage = currentPage;
@@ -164,7 +163,7 @@
             {
                 firstItemIndex = 0;
             }
-            var html = format(messages.infoBarTemplate, firstItemIndex, shownItemsCount, options.totalItems, self.currentPage, numberOfPages);
+            var html = shieldFormat.call(self, messages.infoBarTemplate, firstItemIndex, shownItemsCount, options.totalItems, self.currentPage, numberOfPages);
             self.infoBox.empty();
             self.infoBox.html(html);
         },
@@ -209,10 +208,12 @@
             }
 
             for (var i = startIndex; i < end; i++) {
+                var label = shieldFormat.call(self, messages.pageLabelTemplate, i);
+
                 if (i == currentPage) {
                     selected = " " + SELECTED;
                 }
-                html += "<li class='sui-pager-element'><a data-page='" + i + "' class='sui-pager-number" + selected + "'>" + i + "</a></li>";
+                html += "<li class='sui-pager-element'><a data-page='" + i + "' class='sui-pager-number" + selected + "'>" + label + "</a></li>";
                 selected = "";
             }
 
@@ -323,6 +324,18 @@
 
             self.currentPage = numberOfPages;
             self.refresh();
+        },
+
+        hasNext: function() {
+            var self = this,
+                options = self.options,
+                numberOfPages = Math.ceil(options.totalItems / options.pageSize);
+
+            return self.currentPage < numberOfPages;
+        },
+
+        hasPrev: function() {
+            return this.currentPage > 1;
         },
 
         next: function () {

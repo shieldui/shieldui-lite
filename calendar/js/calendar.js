@@ -1,5 +1,5 @@
 (function ($, shield, win, UNDEFINED) {
-    "use strict";
+    //"use strict";
 
     // some variables global for the closure
     var Widget = shield.ui.Widget,
@@ -16,6 +16,7 @@
         isIE8 = isIE && doc.documentMode === 8,
         extend = $.extend,
         isUndefined = is["undefined"],
+        isString = is.string,
 
 		// widgets stuff
         MONTH = "month",
@@ -192,21 +193,27 @@
     // Calendar class
     Calendar = Widget.extend({
         // initialization method, called by the framework
-        init: function (element, userOptions) {
+        init: function () {
             // call the parent init
             Widget.fn.init.apply(this, arguments);
 
             var self = this,
+                element = $(self.element),
 				options = self.options,
+                cls = options.cls,
                 selectedDate = options.value;
 
-            self.element.addClass("sui-calendar");
+            element.addClass("sui-calendar" + (cls ? (' ' + cls) : ''));
 
             self._focusedDate = options.focused;
             self._view = options.view.start;
             self._enabled = options.enabled;
 
             if (selectedDate) {
+                // make sure any specified date is an object
+                if (isString(selectedDate)) {
+                    selectedDate = new Date(selectedDate);
+                }
                 self._focusedDate = self._selectedDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
             }
 
@@ -219,23 +226,23 @@
             }
 
             if (!options.readOnly && options.enabled) {
-                self.element.find(".sui-prev").on(CLICK, self._movePrev = proxy(self._movePrevHandler, self));
-                self.element.find(".sui-next").on(CLICK, self._moveNext = proxy(self._moveNextHandler, self));
-                self.element.find(".sui-text").on(CLICK, self._changeViewDepth = proxy(self._changeViewDepthHandler, self));
-                self.element.find(".sui-footer").on(CLICK, self._selectToday = proxy(self._selectTodayHandler, self));
+                element.find(".sui-prev").on(CLICK, self._movePrev = proxy(self._movePrevHandler, self));
+                element.find(".sui-next").on(CLICK, self._moveNext = proxy(self._moveNextHandler, self));
+                element.find(".sui-text").on(CLICK, self._changeViewDepth = proxy(self._changeViewDepthHandler, self));
+                element.find(".sui-footer").on(CLICK, self._selectToday = proxy(self._selectTodayHandler, self));
             }
             else {
                 if (options.readOnly) {
-                    self.element.addClass("sui-read-only");
+                    element.addClass("sui-read-only");
                 }
                 else {
-                    self.element.addClass("sui-calendar-disabled");
+                    element.addClass("sui-calendar-disabled");
                 }
             }
 
             // hack for IE<10, the older version of IE do not recognize user-select: none; or -ms-user-select: none;
             if (isIE) {
-                self.element.on(SELECTSTART, self._selectStart = function () { return false; });
+                element.on(SELECTSTART, self._selectStart = function () { return false; });
             }
         },
 
@@ -430,7 +437,7 @@
             if (!self._enabled) {
                 return;
             }
-
+            
             var currentDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
             if (currentDate.getTime() > self._focusedDate) {
                 isNext = true;
@@ -522,15 +529,27 @@
 
             var oldTable = self._calendarTable;
 
+            var transitionEnded = false;
             oldTable.bind("webkitTransitionEnd otransitionend oTransitionEnd msTransitionEnd transitionend", function (e) {
-                oldTable.unbind("webkitTransitionEnd otransitionend oTransitionEnd msTransitionEnd transitionend");
-                oldTable.remove();
-                self._enabled = true;
+                transitionEnded = self._removeOldTable(oldTable, self);
             });
+
+            setTimeout(function () {
+                if (!transitionEnded) {
+                    self._removeOldTable(oldTable, self);
+                }
+            }, 1000);
 
             oldTable.addClass("sui-fade-in");
 
             self._renderTable();
+        },
+
+        _removeOldTable: function (oldTable, self) {
+            oldTable.unbind("webkitTransitionEnd otransitionend oTransitionEnd msTransitionEnd transitionend");
+            oldTable.remove();
+            self._enabled = true;
+            return true;
         },
 
         _viewDepthAnimationEnds: function () {
@@ -544,7 +563,7 @@
             var self = this,
                 views = [MONTH, YEAR, DECADE, CENTURY],
                 currentViewIndex = jQuery.inArray(self._view, views);
-
+    
             if (currentViewIndex < 3 && self._enabled) {
                 self._view = views[currentViewIndex + 1];
 
@@ -649,16 +668,27 @@
                 .addClass("sui-calendar-animation");
 
             self._enabled = false;
+            var transitionEnded = false;
 
             self._tableWrapper.bind("webkitTransitionEnd otransitionend oTransitionEnd msTransitionEnd transitionend", function (e) {
-                self._tempTable.remove();
-                self._calendarTable.insertAfter(self.element.find(".sui-header"));
-                self._tableWrapper.unbind("webkitTransitionEnd otransitionend oTransitionEnd msTransitionEnd transitionend");
-                self._tableWrapper.remove();
-                self._tableWrapper = null;
-
-                self._enabled = true;
+                transitionEnded = self._removeTempTables(self);
             });
+
+            setTimeout(function () {
+                if (!transitionEnded) {
+                    self._removeTempTables(self);
+                }
+            }, 1000);
+        },
+
+        _removeTempTables: function (self) {
+            self._tempTable.remove();
+            self._calendarTable.insertAfter(self.element.find(".sui-header"));
+            self._tableWrapper.unbind("webkitTransitionEnd otransitionend oTransitionEnd msTransitionEnd transitionend");
+            self._tableWrapper.remove();
+            self._tableWrapper = null;
+            self._enabled = true;
+            return true;
         },
 
         _animationEnds: function (isNext) {
@@ -1402,12 +1432,11 @@
 
         // calendar destructor
         destroy: function () {
-            var self = this;
+            var self = this,
+                cls = self.options.cls,
+                element = $(self.element);
 
-            self.element
-                .removeClass("sui-calendar")
-                .removeClass("sui-read-only")
-                .removeClass("sui-calendar-disabled");
+            element.removeClass("sui-calendar sui-read-only sui-calendar-disabled" + (cls ? (' ' + cls) : ''));
 
             self._focusedDate = null;
             self._header = null;
@@ -1418,25 +1447,25 @@
             self._tempTable = null;
             self._tableWrapper = null;
 
-            self.element.find(".sui-prev").off(CLICK, self._movePrev);
+            element.find(".sui-prev").off(CLICK, self._movePrev);
             self._movePrev = null;
 
-            self.element.find(".sui-next").off(CLICK, self._moveNext);
+            element.find(".sui-next").off(CLICK, self._moveNext);
             self._moveNext = null;
 
-            self.element.find(".sui-text").off(CLICK, self._changeViewDepth);
+            element.find(".sui-text").off(CLICK, self._changeViewDepth);
             self._changeViewDepth = null;
 
-            self.element.find(".sui-footer").off(CLICK, self._selectToday);
+            element.find(".sui-footer").off(CLICK, self._selectToday);
             self._selectToday = null;
 
-            self.element.find(".sui-calendar-view").off(CLICK, self._calendarSelection);
+            element.find(".sui-calendar-view").off(CLICK, self._calendarSelection);
             self._calendarSelection = null;
 
-            self.element.off(SELECTSTART, self._selectStart);
+            element.off(SELECTSTART, self._selectStart);
             self._selectStart = null;
 
-            self.element.empty();
+            element.empty();
 
             Widget.fn.destroy.call(self);
         }
@@ -1450,7 +1479,7 @@
     // datePicker settings
     datePickerDefaults = {
         calendar: null, // - Contains settings for underlying calendar widget.
-        format: "{0:MM/dd/yyyy}", // - string contains the format of the date which is assinged to the hiiden input. This formatted value is submited.
+        format: "{0:MM/dd/yyyy}", // - string contains the format of the date which is assinged to the hidden input. This formatted value is submited.
         textTemplate: "{0:MM/dd/yyyy}", // - Contains the format string or callback function used for formatting the value into the date input.
         value: null, // - contains the selected date.
         parseFormats: ["MM/dd/yyyy"], //- List of date formats used to parse the value set with value() method or by direct user input. 
@@ -1504,10 +1533,9 @@
             self._wrapper = wrapper;
 
             self._visibleInput = $("<input class='sui-picker-input' type='text' />")
-                        .appendTo(wrapper);
+                .appendTo(wrapper);
 
             if (options.showButton) {
-
                 var tooltipText = options.messages.calendarIconTooltip;
                 if (options.isTimePicker) {
                     tooltipText = options.messages.timeIconTooltip;
@@ -1526,7 +1554,6 @@
                     $('<span class="sui-sprite sui-time-icon" unselectable="on">' + options.messages.buttonText + "</span>")
                         .appendTo(self._timeIconWrapper);
                 }
-
             }
 
             $(element).css(DISPLAY, NONE)
@@ -1540,13 +1567,27 @@
             }
             self._attachEvents();
 
+            // initialize the selected date from the value attribute if not set
+            if (!selectedDate) {
+                var valueAttr = self._value();
+                if (valueAttr) {
+                    selectedDate = valueAttr;
+                }
+            }
+
             if (selectedDate) {
+                // make sure any specified date is an object
+                if (isString(selectedDate)) {
+                    selectedDate = new Date(selectedDate);
+                }
+
                 if (options.isMonthYearPicker) {
                     self._selectedDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
                 }
                 else {
                     self._selectedDate = selectedDate;
                 }
+
                 self._changeInputsValues(selectedDate);
             }
         },
@@ -1560,7 +1601,8 @@
                     return shieldFormat(formatedValue, item.date);
                 };
 
-            self.element.get(0).value = formatedValueFunc.call(self, { date: selectedDate });
+            //self.element.get(0).value = formatedValueFunc.call(self, { date: selectedDate });
+            self._value(formatedValueFunc.call(self, { date: selectedDate }));
 
             var textTemplateFunc = isFunc(textTemplate) ? textTemplate : function (item) {
                 return shieldFormat(textTemplate, item.date);
@@ -1708,9 +1750,9 @@
             var key = e.keyCode || e.charCode;
 
             if (key == 13 || key == 9 || key == 27) {
-                this._shouldShowPopup = true;
-                if (this.calendar.element.css(DISPLAY) != NONE) {
-                    this.calendar.element.css(DISPLAY, NONE);
+                self._shouldShowPopup = true;
+                if (self.calendar && self.calendar.element.css(DISPLAY) != NONE) {
+                    self.calendar.element.css(DISPLAY, NONE);
                     self.trigger(CLOSE);
                 }
             }
@@ -2208,6 +2250,10 @@
             $(this._visibleInput).focus();
         },
 
+        _value: function() {
+            return this.element.attr.apply(this.element, ["value"].concat([].slice.call(arguments)));
+        },
+
         value: function () {
             var self = this,
                 options = self.options,
@@ -2353,7 +2399,6 @@
             var self = this;
 
             if (self.calendar) {
-
                 self.calendar.off(CHANGE, self._calendarChange);
                 self._calendarChange = null;
 
@@ -2362,6 +2407,7 @@
 
                 self.calendar.destroy();
                 self.calendar = null;
+
                 if (self._calendarWrapper) {
                     self._calendarWrapper.remove();
                 }

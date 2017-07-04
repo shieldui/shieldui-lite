@@ -16,7 +16,6 @@
 	"noempty": true,
 	"nonew": true,
 	"undef": true,
-	"strict": true,
 	"trailing": true,
 	"unused": false,
 	"globals": {

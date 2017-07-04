@@ -1,0 +1,33 @@
+/* Shield UI Lite 1.7.31 | Copyright 2013-2017 Shield UI Ltd. | https://www.shieldui.com */
+
+/*Shield UI Lite
+
+Copyright (c) 2013-2017 ShieldUI Ltd., https://www.shieldui.com
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+====
+
+All files located in the node_modules, bower_components and external 
+directories are externally maintained libraries used by this software which 
+have their own licenses; we recommend you read them, as their terms may 
+differ from the terms above.
+*/
+
+.sui-rating{display:-moz-inline-box;display:inline-block;position:relative;user-select:none;-webkit-user-select:none;-khtml-user-select:none;-moz-user-select:none;-o-user-select:none;-ms-user-select:none;-webkit-touch-callout:none}.sui-rating-disabled{opacity:.4;filter:alpha(opacity=40)}.sui-rating .sui-rating-range{position:relative;display:inline-block;background:url(../img/stars.png);height:16px;outline:0}.sui-rating .sui-rating-range *{display:block}* html .sui-rating,* html .sui-rating .sui-rating-range{display:inline}*+html .sui-rating,*+html .sui-rating .sui-rating-range{display:inline}.sui-rating .sui-rating-hover,.sui-rating .sui-rating-selected{position:absolute;left:0}.sui-rating .sui-rating-hover-rtl,.sui-rating .sui-rating-selected-rtl{left:auto;right:0}.sui-rating .sui-rating-hover,.sui-rating .sui-rating-selected,.sui-rating .sui-rating-preset,.sui-rating .sui-rating-preset-rtl{background-image:url(../img/stars.png)}.sui-rating .sui-rating-selected{background-position:left -208px}.sui-rtl .sui-rating .sui-rating-selected{background-position:right -208px}.sui-rating .sui-rating-hover,.sui-rating .sui-rating-preset,.sui-rating .sui-rating-preset-rtl{background-position:left -224px}.sui-rtl .sui-rating .sui-rating-hover{background-position:right -224px}

@@ -640,7 +640,7 @@ test("Widget uses base Dispatcher functionality", function () {
             }
         });
 
-    strictEqual(widget.events.evt1[0], handler);
+    strictEqual(widget.events.evt1[0].handler, handler);
 
     widget.trigger("evt1");
     ok(handler.calledOnce);
@@ -873,18 +873,18 @@ test("Dispatcher can remove event handlers", function () {
 
     strictEqual(disp.events.evt1.length, 2);
     strictEqual(disp.events.evt2.length, 1);
-    strictEqual(disp.events.evt1[0], handler1);
-    strictEqual(disp.events.evt1[1], handler2);
-    strictEqual(disp.events.evt2[0], handler3);
+    strictEqual(disp.events.evt1[0].handler, handler1);
+    strictEqual(disp.events.evt1[1].handler, handler2);
+    strictEqual(disp.events.evt2[0].handler, handler3);
 
     disp.off("evt1", function () { });
     strictEqual(disp.events.evt1.length, 2);
-    strictEqual(disp.events.evt1[0], handler1);
-    strictEqual(disp.events.evt1[1], handler2);
+    strictEqual(disp.events.evt1[0].handler, handler1);
+    strictEqual(disp.events.evt1[1].handler, handler2);
 
     disp.off("evt1", handler1);
     strictEqual(disp.events.evt1.length, 1);
-    strictEqual(disp.events.evt1[0], handler2);
+    strictEqual(disp.events.evt1[0].handler, handler2);
 
     disp.off("evt2", handler3);
     strictEqual(disp.events.evt2, undefined);
@@ -892,9 +892,9 @@ test("Dispatcher can remove event handlers", function () {
     disp.on("evt1", handler1);
     disp.on("evt1", handler3);
     strictEqual(disp.events.evt1.length, 3);
-    strictEqual(disp.events.evt1[0], handler2);
-    strictEqual(disp.events.evt1[1], handler1);
-    strictEqual(disp.events.evt1[2], handler3);
+    strictEqual(disp.events.evt1[0].handler, handler2);
+    strictEqual(disp.events.evt1[1].handler, handler1);
+    strictEqual(disp.events.evt1[2].handler, handler3);
 
     disp.off("evt1");
     strictEqual(disp.events.evt1, undefined);
@@ -910,8 +910,8 @@ test("Dispatcher can register to events through initialization options", functio
             }
         });
 
-    strictEqual(disp.events.evt1[0], handler1);
-    strictEqual(disp.events.evt2[0], handler2);
+    strictEqual(disp.events.evt1[0].handler, handler1);
+    strictEqual(disp.events.evt2[0].handler, handler2);
 
     disp.trigger("evt1");
     disp.trigger("evt2");
@@ -960,3 +960,84 @@ test("Dispatcher removes all events on destroy", function () {
 
     deepEqual(disp.events, {});
 });
+
+test("Dispatcher can support namespaced events", function () {
+    var disp = new shield.Dispatcher(),
+        handler1 = sinon.spy(),
+        handler2 = sinon.spy(),
+        handler3 = sinon.spy();
+
+    disp.on('evtx', handler1);
+    disp.on('evtx.ns1', handler2);
+    disp.on('evtx.ns2', handler3);
+
+    strictEqual(disp.events.evtx.length, 3);
+
+    disp.trigger('evtx');
+
+    ok(handler1.calledOnce);
+    ok(handler2.calledOnce);
+    ok(handler3.calledOnce);
+
+    disp.off('evtx.ns1');
+
+    strictEqual(disp.events.evtx.length, 2);
+
+    disp.trigger('evtx');
+
+    ok(handler1.calledTwice);
+    ok(handler2.calledOnce);
+    ok(handler3.calledTwice);
+
+    disp.off('evtx');
+
+    strictEqual(disp.events.evtx, undefined);
+
+    disp.trigger('evtx');
+
+    ok(handler1.calledTwice);
+    ok(handler2.calledOnce);
+    ok(handler3.calledTwice);
+});
+
+test("Dispatcher remove all events for a namespace", function () {
+    var disp = new shield.Dispatcher(),
+        handler1 = sinon.spy(),
+        handler2 = sinon.spy(),
+        handler3 = sinon.spy(),
+        handler4 = sinon.spy(),
+        handler5 = sinon.spy();
+
+    disp.on('evtx', handler1);
+    disp.on('evtx.ns1', handler2);
+    disp.on('evtx.ns2', handler3);
+    disp.on('evtx.ns2', handler4);
+    disp.on('anotherevt.ns2', handler5);
+
+    strictEqual(disp.events.evtx.length, 4);
+    strictEqual(disp.events.anotherevt.length, 1);
+
+    disp.trigger('evtx');
+    disp.trigger('anotherevt');
+
+    ok(handler1.calledOnce);
+    ok(handler2.calledOnce);
+    ok(handler3.calledOnce);
+    ok(handler4.calledOnce);
+    ok(handler5.calledOnce);
+    
+    disp.off('.ns2');
+
+    strictEqual(disp.events.evtx.length, 2);
+    strictEqual(disp.events.anotherevt, undefined);
+
+    disp.trigger('evtx');
+    disp.trigger('anotherevt');
+
+    ok(handler1.calledTwice);
+    ok(handler2.calledTwice);
+    ok(handler3.calledOnce);
+    ok(handler4.calledOnce);
+    ok(handler5.calledOnce);
+});
+

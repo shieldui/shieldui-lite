@@ -1,7 +1,8 @@
 /* ShieldUI LESS styles common for all themes */
 
 /* default theme settings */
-@font-family: "Arial,Helvetica,sans-serif";
+@font-family: Helvetica,Arial,sans-serif;
+@font-size: 14px;
 
 /* by default the themes are not gradient */
 @theme-gradient: false;
@@ -44,7 +45,7 @@
 }
 
 /* vertical gradient from the given color to a lighter one */
-.sui-gradient-vertical-reverse(@endcolor) when (@theme-gradient = true) {
+.sui-gradient-vertical-reverse(@color) when (@theme-gradient = true) {
 	.sui-gradient-vertical(@color, lighten(@color, @gradient-percentage));
 }
 
@@ -65,4 +66,10 @@
     -o-user-select: none;
     -ms-user-select: none;
     -webkit-touch-callout: none;
+}
+
+/* border-box */
+.sui-borderbox() {
+	box-sizing: border-box;
+	-moz-box-sizing: border-box;
 }

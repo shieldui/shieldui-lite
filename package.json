@@ -22,5 +22,6 @@
     "grunt-contrib-cssmin": "~0.6.0",
     "grunt-contrib-concat": "~0.2.0"
   },
-  "keywords": []
+  "keywords": [],
+  "version": "1.7.31"
 }

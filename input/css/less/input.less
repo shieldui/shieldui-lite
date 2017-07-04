@@ -41,11 +41,10 @@
     white-space: nowrap;
     line-height: normal;
     font-weight: normal;
-    box-sizing: border-box;
-    -moz-box-sizing: border-box;
-	font-size: 14px;
+	font-size: @font-size;
 	font-family: @font-family;
 	text-align: left;
+	.sui-borderbox();
 }
 /* white-space needs to be pre-wrap on textareas otherwise it will not be multi-line */
 textarea.sui-input { 
@@ -68,7 +67,7 @@ ul.sui-listbox {
 	margin: 0px;
 	padding: 0px;
 	outline: 0;
-	font-size: 14px;
+	font-size: @font-size;
 	font-family: @font-family;
 }
 .sui-listbox:focus {
@@ -79,12 +78,13 @@ ul.sui-listbox {
     text-align: left;
 }
 .sui-listbox-item:hover, 
-.sui-listbox-item-active {
+.sui-listbox:focus .sui-listbox-item-active {
     cursor: pointer;
 	color: @primary-text-color;
 	background-color: @primary-hover-color;
 	.sui-gradient-vertical(@primary-hover-color);
 }
+
 .sui-listbox-item-selected {
 	color: @primary-text-color;
 	background-color: @primary-background-color;
@@ -270,7 +270,7 @@ ul.sui-autocomplete {
     margin: 0px;
     padding: 0px;
 	max-height: 300px;
-	font-size: 14px;
+	font-size: @font-size;
 	font-family: @font-family;
 	z-index: 1800;
 }
@@ -310,11 +310,17 @@ ul.sui-autocomplete {
 	border-color: @default-border-color;
 	border-width: 1px;
 	border-style: solid;
-	padding: 0.3em;
+	padding: 0.3em 0.6em;
 	cursor: pointer;
 	overflow: hidden;
 	text-align: center;
 	.sui-unselectable();
+}
+/* Firefox button padding fix */
+button.sui-button::-moz-focus-inner,
+input[type="button"].sui-button::-moz-focus-inner {
+	border: 0;
+	padding: 0;
 }
 .sui-button:focus {
 }
@@ -342,13 +348,23 @@ ul.sui-autocomplete {
     opacity: 0.4;
 }
 
+/* SplitButton styles */
+.sui-button-split-handle {
+	margin-left: -1px;
+}
+ul.sui-menu.sui-button-split-menu, 
+.sui-menu.sui-button-split-menu {
+	cursor: pointer;
+}
+
 /* Checkbox styles */
 .sui-checkbox {
     display: inline-block;
     cursor: pointer;
     .sui-unselectable();
-	font-size: 14px;
+	font-size: @font-size;
 	font-family: @font-family;
+	outline: 0;
 }
 .sui-checkbox-input {
     display: none;
@@ -366,6 +382,9 @@ ul.sui-autocomplete {
 }
 .sui-checkbox-element:hover {
     border-color: @primary-border-color;
+}
+.sui-checkbox:focus .sui-checkbox-element {
+	border-color: @primary-border-color;
 }
 .sui-checkbox-unchecked .sui-checkmark,
 .sui-checkbox-indeterminate .sui-checkmark {
@@ -409,7 +428,8 @@ ul.sui-autocomplete {
     cursor: default;
     opacity: 0.4;
 }
-.sui-checkbox-disabled .sui-checkbox-element:hover {
+.sui-checkbox-disabled .sui-checkbox-element:hover,
+.sui-checkbox-disabled:focus .sui-checkbox-element {
     border-color: @border-color;
 }
 
@@ -418,8 +438,9 @@ ul.sui-autocomplete {
     display: inline-block;
     cursor: pointer;
     .sui-unselectable();
-	font-size: 14px;
+	font-size: @font-size;
 	font-family: @font-family;
+	outline: 0;
 }
 .sui-radiobutton-input {
     display: none;
@@ -430,7 +451,6 @@ ul.sui-autocomplete {
     width: 0.75em;
     height: 0.75em;
     line-height: 0.8em;
-    font-size: 1em;
     vertical-align: bottom;
 	background-color: @background-color;
     border-color: @border-color;
@@ -444,6 +464,9 @@ ul.sui-autocomplete {
 }
 .sui-radiobutton-element:hover {
     border-color: @primary-border-color;
+}
+.sui-radiobutton:focus .sui-radiobutton-element {
+	border-color: @primary-border-color;
 }
 .sui-radiobutton .sui-checkmark {
     display: block;
@@ -470,6 +493,10 @@ ul.sui-autocomplete {
 .sui-radiobutton-disabled.sui-radiobutton {
     cursor: default;
     opacity: 0.4;
+}
+.sui-radiobutton-disabled .sui-radiobutton-element:hover,
+.sui-radiobutton-disabled:focus .sui-radiobutton-element {
+	border-color: @border-color;
 }
 
 /* Swith styles */
@@ -505,7 +532,7 @@ ul.sui-autocomplete {
 }
 .sui-switch-text {
 	vertical-align: middle;
-	font-size: 12px;
+	font-size: 0.9em;
 }
 .sui-switch-checked .sui-switch-inner {
 	padding-left: 0.1em;

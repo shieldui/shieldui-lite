@@ -1,0 +1,33 @@
+/* Shield UI Lite 1.7.31 | Copyright 2013-2017 Shield UI Ltd. | https://www.shieldui.com */
+
+/*Shield UI Lite
+
+Copyright (c) 2013-2017 ShieldUI Ltd., https://www.shieldui.com
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+====
+
+All files located in the node_modules, bower_components and external 
+directories are externally maintained libraries used by this software which 
+have their own licenses; we recommend you read them, as their terms may 
+differ from the terms above.
+*/
+
+.sui-menu,ul.sui-menu{position:relative;display:inline-block;list-style:none;color:#333;background-color:#f8f8f8;border:1px solid #e7e7e7;margin:0;padding:0;outline:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;line-height:normal;overflow:visible;cursor:default}.sui-context-menu{display:inline-block;position:absolute;overflow:visible;box-shadow:1px 1px 2px #e7e7e7;z-index:1120}.sui-menu:not(.sui-menu-top){box-shadow:1px 1px 2px #e7e7e7}ul.sui-menu-focus,.sui-menu-focus{}.sui-menu-horizontal>li{display:inline-block}.sui-menu-submenu{position:absolute;display:inline-block;z-index:1100}.sui-menu-submenu .sui-menu{width:100%}.sui-menu-item{padding:0;position:relative}.sui-menu-item-separator{background-color:#e7e7e7}a.sui-menu-item-link,a.sui-menu-item-link:link,a.sui-menu-item-link:visited,a.sui-menu-item-link:hover,a.sui-menu-item-link:active{outline:0;display:block;padding-top:.5em;padding-bottom:.5em;padding-left:.85em;padding-right:.85em;text-decoration:inherit;color:inherit;font-weight:inherit;font-style:inherit;white-space:nowrap}.sui-menu-item-text{display:inline-block;vertical-align:middle}.sui-menu-item-icon{display:inline-block;width:16px;height:16px;vertical-align:middle;overflow:hidden;margin-right:.5em}.sui-menu-item-icon img{width:16px;height:16px;border:0}.sui-menu-horizontal>.sui-menu-item-separator{width:0;padding-left:0;padding-right:0;border-left:solid 1px #e7e7e7}.sui-menu-vertical>.sui-menu-item-separator{height:0;padding-top:0;padding-bottom:0;border-top:solid 1px #e7e7e7}.sui-menu-item:hover{color:#fff;background-color:#4fa7ef}.sui-menu-focus .sui-menu-item-selected{color:#fff;background-color:#428bca}.sui-menu-item-disabled,.sui-menu-item-disabled:hover{pointer-events:none;cursor:default;opacity:.4;color:#333;background-color:#f8f8f8}.sui-menu-horizontal>li>a>.sui-menu-item-children-caret{display:inline-block;zoom:1;width:0;height:0;line-height:0;border-left:.4em solid transparent;border-right:.4em solid transparent;border-top:.4em solid;vertical-align:middle;margin-left:6px}.sui-menu-vertical>li>a>.sui-menu-item-children-caret{display:inline-block;zoom:1;width:0;height:0;line-height:0;border-left:.4em solid;border-top:.4em solid transparent;border-bottom:.4em solid transparent;vertical-align:middle;margin-left:10px;position:absolute;right:12px;margin-top:5px}.sui-menu-vertical>li>a>.sui-menu-item-text-hc{margin-right:16px}

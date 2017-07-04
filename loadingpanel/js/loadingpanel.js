@@ -1,5 +1,5 @@
 (function ($, shield, win, UNDEFINED) {
-    "use strict";
+    //"use strict";
 
     // some variables global for the closure
     var Widget = shield.ui.Widget,

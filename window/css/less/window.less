@@ -1,0 +1,98 @@
+﻿/* Import the theme */
+@import "../../../common/less/themes/@{theme}.less";
+
+/* ShieldUI Window general styles */
+.sui-window {
+	display: block;
+	color: @text-color;
+	background-color: @background-color;
+	.sui-border-shadow();
+    border-style: solid;
+    border-width: 1px;
+	border-color: @border-color;
+    z-index: 1100;
+    line-height: normal;
+    font-size: @font-size;
+    font-family: @font-family;
+}
+.sui-window-titlebar {
+	position: relative;
+	clear: both;
+	width: 100%;
+	height: 35px;
+	overflow: hidden;
+	color: @primary-text-color;
+	border-color: @primary-border-color;
+	background-color: @primary-background-color;
+	.sui-gradient-vertical(@primary-background-color);
+}
+.sui-window-title {
+	float: left;
+	display: inline-block;
+	padding: 0.7em;
+}
+.sui-window-icons {
+	float: right;
+	display: inline-block;
+	margin-top: 6px;
+	margin-right: 2px;
+}
+.sui-window-button,
+.sui-button.sui-window-button {
+	width: 22px;
+	height: 22px;
+	cursor: pointer;
+	margin-right: 3px;
+	padding: 0px;
+	text-align: center;
+	border: none;
+	background-color: transparent;
+	background-image: none;
+}
+.sui-window-button:hover {
+	background-color: @primary-hover-color;
+}
+.sui-window-button-icon {
+	margin: auto;
+	margin-top: 2px;
+}
+.sui-window-button-icon-close {
+	background-position: -48px 0px;
+}
+.sui-window-button-icon-maximize {
+	background-position: -64px 0px;
+}
+.sui-window-button-icon-restore {
+	background-position: -80px 0px;
+}
+.sui-window-button-icon-minimize {
+	background-position: -96px 0px;
+}
+.sui-window-button-icon-unminimize {
+	background-position: -80px 0px;
+}
+.sui-window-button-icon-pin {
+	background-position: -112px 0px;
+}
+.sui-window-button-icon-unpin {
+	background-position: -128px 0px;
+}
+.sui-window-content {
+	position: relative;
+	clear: both;
+	display: inline-block;
+	overflow: auto;
+	padding: 7px;
+	background-color: @background-color;
+}
+.sui-window-modal {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%; 
+    z-index: 1000;
+	background-color: @overlay-background-color;
+	opacity: 0.35;
+    filter: alpha(opacity=35);
+}

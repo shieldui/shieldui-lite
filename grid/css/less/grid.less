@@ -14,17 +14,16 @@
     border-collapse: collapse;
     border-style: none solid solid;
     border-width: 1px;
-    font-size: 1em;
     height: auto;
     outline: 0 none;
-	font-size: 14px;
 	font-family: @font-family;
+	font-size: @font-size;
 }
 .sui-grid-core .sui-gridheader {
     background-attachment: scroll;
     background-position: 0 0;
     background-repeat: repeat-x;
-    overflow-x: hidden;
+	overflow: hidden;
 }
 .sui-grid-core .sui-table {
     border: 0 none;
@@ -33,10 +32,12 @@
     border-spacing: 0;
     border-collapse: collapse;
     empty-cells: show;
-    user-select: none;
+    .sui-unselectable();
 }
-.sui-grid-core .sui-selectable, .sui-grid-core .sui-non-selectable,
-.sui-grid-core .sui-expand, .sui-grid .sui-collapse, 
+.sui-grid-core .sui-selectable,
+.sui-grid-core .sui-non-selectable,
+.sui-grid-core .sui-expand,
+.sui-grid .sui-collapse,
 .sui-grid .sui-group-panel {
     .sui-unselectable();
 }
@@ -57,9 +58,7 @@
     overflow: hidden;
 }
 .sui-grid-core .sui-scroller .sui-content {
-    float: left;
-    overflow-x: auto;
-    overflow-y: scroll;
+	overflow: auto;
 }
 .sui-grid-core .sui-scroller .sui-virtualized.sui-content {
     float: none;
@@ -82,6 +81,7 @@
     vertical-align: middle;
     white-space: normal;
     width: auto;
+	outline: 0;
 }
 .sui-grid-core .sui-footer-cell {
     display: table-cell;
@@ -108,14 +108,22 @@
     text-align: left;
     text-overflow: ellipsis;
     font-size: 1.1em;
-    padding: 0.518em;
+    padding-top: 0.658em;
+	padding-bottom: 0.518em;
+	padding-left: 0.518em;
+	padding-right: 0.518em;
     white-space: normal;
     font-weight: bold;
 }
 .sui-headercontent {
-    border-right: 1px solid;
-    overflow: hidden;
-    position: relative;
+	position: relative;
+	overflow: hidden;
+    border-right-style: solid;
+    border-right-width: 1px;
+}
+.sui-headercontent.sui-no-y-scroll {
+	border-right-style: none;
+    border-right-width: 0;
 }
 .sui-area {
     position: absolute;
@@ -147,6 +155,7 @@
 .sui-grid-core .sui-ascending {
     font-size: 0.7em;
     padding-left: 0.3em;
+	line-height: 100%;
 }
 .sui-grid-core .sui-collapse-cell {
     border-bottom: none;
@@ -164,8 +173,8 @@
 .sui-grid-core .sui-expand-cell,
 .sui-grid-core .sui-collapse-cell {
     cursor: pointer;
+	.sui-unselectable();
 }
-
 .sui-grid-core .sui-resizable-handle {
     cursor: col-resize;
     position: absolute;
@@ -173,7 +182,7 @@
 
 /* Column Reordering */
 .sui-reorderable .sui-headercell {
-    cursor: default;    
+    cursor: default;
 }
 .sui-grid-reorder-indicator {
     position: absolute;
@@ -210,8 +219,18 @@
 .sui-grid-core .sui-cell .sui-button {
     margin-right: 0.6em;
 }
+.sui-grid-core .sui-toolbar .sui-button:last-child,
+.sui-grid-core .sui-cell .sui-button:last-child {
+	margin-right: 0;
+}
 
 /* Editing */
+.sui-edit,
+.sui-delete,
+.sui-update,
+.sui-cancel {
+}
+
 .sui-grid-core .sui-editable-cell .sui-numeric-textbox,
 .sui-grid-core .sui-editable-cell .sui-input,
 .sui-grid-core .sui-editable-cell .sui-datepicker,
@@ -227,6 +246,7 @@
 
 .sui-grid-core .sui-button-cell {
     padding: 0.3em;
+	text-align: center;
 }
 .sui-grid-core .sui-updated-marker {
 	position: absolute;
@@ -269,6 +289,32 @@
 .sui-filter-cell .sui-button:hover .sui-clear-filter-button-content {
     background-position: -160px 0px;
 }
+
+/* Exporting */
+.sui-grid-button-text {
+	display: inline-block;
+	vertical-align: middle;
+}
+.sui-grid-icon-export-excel {
+	display: inline-block;
+	vertical-align: middle;
+	background-position: -192px unit(-@sprite-position * 16, px);
+}
+.sui-button:hover .sui-grid-icon-export-excel,
+.sui-grid-icon-export-excel:hover {
+	background-position: -192px 0px;
+}
+.sui-button:hover .sui-grid-icon-export-pdf,
+.sui-grid-icon-export-pdf {
+	display: inline-block;
+	vertical-align: middle;
+	background-position: -192px unit(-@sprite-position * 16, px);
+}
+.sui-button:hover .sui-grid-icon-export-pdf,
+.sui-grid-icon-export-pdf:hover {
+	background-position: -192px 0px;
+}
+
 
 .sui-grid-core .sui-group-footer-cell {
     display: table-cell;
@@ -321,6 +367,9 @@
     margin-right: 0.3em;
     margin-left: 0.3em;
 }
+.sui-grid-core .sui-group-panel .sui-group-close-button {
+	margin-right: 0.25em;
+}
 .sui-grid-core .sui-group-panel .sui-descending,
 .sui-grid-core .sui-group-panel .sui-ascending,
 .sui-grid-core .sui-group-panel .sui-group-title {
@@ -328,8 +377,8 @@
 }
 .sui-grid-core .sui-group-panel .sui-descending,
 .sui-grid-core .sui-group-panel .sui-ascending {
-    padding-top: 0.5em;
-    padding-bottom: 0.5em;
+    display: inline-block;
+	vertical-align: middle;
 }
 .sui-grid-core .sui-grid-no-gap {
     border-right-width: 0px;
@@ -409,7 +458,8 @@
 /* Toolbar */
 .sui-grid .sui-toolbar {
     border-top: 1px solid @border-color;
-    color: @text-color;   
+    color: @text-color;
+	background-color: @background-color;
 }
 .sui-grid .sui-toolbar.sui-toolbar-bottom {
     border-top: none;
@@ -439,7 +489,9 @@
 }
 .sui-grid .sui-group-header,
 .sui-grid .sui-group-header .sui-indent-cell,
-.sui-grid .sui-group-intend-cell {
+.sui-grid .sui-group-intend-cell,
+.sui-grid .sui-row:hover .sui-group-intend-cell, 
+.sui-grid .sui-alt-row:hover .sui-group-intend-cell {
     background: none repeat scroll 0 0;
 	.sui-grid-alt-background(@background-color); 
 }
@@ -471,4 +523,123 @@
 .sui-grid .sui-group-panel,
 .sui-grid .sui-group-panel-indicator {
     background-color: @background-color;
+}
+
+
+.sui-grid .sui-footer {
+    border: 1px solid;
+    border-color: @border-color;
+    background-attachment: scroll;
+    background-position: 0 0;
+    background-repeat: repeat-x;
+    overflow-x: hidden;
+    margin-left: -1px;
+    margin-right: -1px;
+    border-top: none;
+}
+
+.sui-grid .sui-footer td {
+    border-collapse: collapse; 
+}
+
+.sui-grid .sui-footer table {
+    border-spacing: 0px;
+}
+
+.sui-grid .sui-footer-content {
+    border-right: 1px solid;
+    overflow: hidden;
+    position: relative;
+    border-color: @border-color;
+}
+
+
+.sui-edit-form-label {
+    float: left;
+    clear: both;
+    width: 30%;
+    padding: .4em 0 1em;
+    margin-left: 2%;
+    text-align: right;
+}
+
+.sui-edit-field {
+    float: right;
+    clear: right;
+    width: 60%;
+    margin-right: 2%;
+    padding: 0 0 .6em;
+}
+
+.sui-window-content .sui-input-textbox {
+   width: 134px;
+}
+
+.sui-edit-form-container {
+	padding-top: 10px;
+}
+
+.sui-popup-buttons {
+    clear: both;
+    text-align: right;
+    border-width: 1px 0 0;
+    border-style: solid;
+    position: relative;
+    bottom: -1em;
+    padding: .6em;
+	border-color: @border-color;
+}
+
+.sui-popup-buttons .sui-button {
+    margin: 0 .16em;
+}
+
+
+/* Frozen Columns*/
+.sui-header-locked {
+	display: inline-block;
+	vertical-align: top;
+	border-right: solid 1px @border-color;
+}
+.sui-header-locked .sui-table,
+.sui-header-locked .sui-table-ie7 {
+	width: auto;
+}
+.sui-header-locked + .sui-headercontent {
+	display: inline-block;
+	vertical-align: top;
+}
+
+.sui-content-locked {
+	display: inline-block;
+	vertical-align: top;
+	border-right: solid 1px @border-color;
+	overflow: hidden;
+}
+.sui-content-locked .sui-table,
+.sui-content-locked .sui-table-ie7 {
+	width: auto;
+	margin-bottom: 500px;
+}
+.sui-content-locked + .sui-content {
+	display: inline-block;
+	vertical-align: top;
+}
+
+
+/* Keyboard Navigation */
+.sui-grid-nav {
+}
+.sui-grid-nav .sui-headercell[tabindex="0"]:focus,
+.sui-grid-nav .sui-filter-cell[tabindex="0"]:focus,
+.sui-grid-nav .sui-cell[tabindex="0"]:focus,
+.sui-grid-nav .sui-footer-cell[tabindex="0"]:focus {
+    color: @primary-text-color;
+	background-color: @primary-hover-color;
+	.sui-gradient-vertical(@primary-hover-color);
+}
+.sui-grid-nav .sui-button:focus {
+	color: @primary-text-color;
+	background-color: @primary-hover-color;
+	.sui-gradient-vertical(@primary-hover-color);
 }

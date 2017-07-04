@@ -1,10 +1,11 @@
 (function ($, shield, win, UNDEFINED) {
-    "use strict";
+    //"use strict";
 
     // some variables global for the closure
     var Widget = shield.ui.Widget,
 		Class = shield.Class,
 		DataSource = shield.DataSource,
+        Position = shield.ui.Position,
 
 		keyCode = shield.Constants.KeyCode,
 		error = shield.error,
@@ -17,6 +18,7 @@
         toNumber = shield.to.number,
         browser = shield.support.browser,
         shieldFormat = shield.format,
+        strid = shield.strid,
 
 		doc = document,
 		mathMin = Math.min,
@@ -38,16 +40,43 @@
 		comboBoxDefaults, ComboBox,
 		dropDownDefaults, DropDown,
 		buttonDefaults, Button,
+        splitButtonDefaults, SplitButton,
 		checkBoxDefaults, CheckBox,
 		radioButtonDefaults, RadioButton,
         switchDefaults, Switch,
 
 		// some constants
+        ID = "id",
+        ROLE = "role",
+        TRUE = "true",
+        FALSE = "false",
+        LISTBOX = "listbox",
+        TEXTBOX = "textbox",
+        BUTTON = "button",
+        SWITCH = "switch",
+        ARIA = "aria",
+        ARIA_SELECTED = ARIA + "-selected",
+        ARIA_AUTOCOMPLETE = ARIA + "-autocomplete",
+        ARIA_ACTIVEDESCENDANT = ARIA + "-activedescendant",
+        ARIA_MULTILINE = ARIA + "-multiline",
+        ARIA_VALUENOW = ARIA + "-valuenow",
+        ARIA_VALUEMIN = ARIA + "-valuemin",
+        ARIA_VALUEMAX = ARIA + "-valuemax",
+        ARIA_VALUETEXT = ARIA + "-valuetext",
+        ARIA_DISABLED = ARIA + "-disabled",
+        ARIA_HASPOPUP = ARIA + "-haspopup",
+        ARIA_CHECKED = ARIA + "-checked",
+        ARIA_LABEL = ARIA + "-label",
+        ARIA_LABELLEDBY = ARIA + "-labelledby",
+        ARIA_CONTROLS = ARIA + "-controls",
+        ARIA_READONLY = ARIA + "-readonly",
+        ARIA_EXPANDED = ARIA + "-expanded",
         ALT = "alt",
         TITLE = "title",
 		DISABLED = "disabled",
 		CHECKED = "checked",
 		SELECTED = "selected",
+        ITEMCLICK = "itemclick",
 		TABINDEX = "tabindex",
         MOUSEDOWN = "mousedown",
         MOUSEUP = "mouseup",
@@ -86,6 +115,7 @@
 		// a function to determine it from an element
 		UTYPE_SELECT = "uts",
 		UTYPE_INPUT = "uti",
+        UTYPE_TEXTAREA = "utta",
 		UTYPE_OTHER = "uto",
 		getUType = function(element) {
 			var tagname = $(element).prop("tagName").toLowerCase();
@@ -95,10 +125,18 @@
 			else if (tagname == INPUT) {
 				return UTYPE_INPUT;
 			}
+            else if (tagname == "textarea") {
+                return UTYPE_TEXTAREA;
+            }
 			else {
 				return UTYPE_OTHER;
 			}
 		},
+
+        // HTML encoding function
+        htmlEncode = function(value) {
+            return $('<div/>').text(value).html();
+        },
 
 		// function to move cursor to the end of input element
 		cursorAtEnd = function(element) {
@@ -222,6 +260,9 @@
 				return;
 			}
 
+            // generate an instance-unique event namespace
+            self._eventNS = ".shieldListBox" + self.getInstanceId();
+
 			// before rendering, try to initialize the selected and values properties 
 			// from the underlying element, if the options are not set
 			if (!isDefined(values) && !isDefined(selected) && (utype == UTYPE_SELECT || utype == UTYPE_INPUT)) {
@@ -240,14 +281,10 @@
 			// hide the original element
 			original.hide();
 
-			// init the focus and blur handlers
-			self._focusHandler = proxy(self._focus, self);
-			self._blurHandler = proxy(self._blur, self);
-
 			// create a new element to render the listbox in
-			self.element = element = $("<ul/>")
-				.on(FOCUS, self._focusHandler)
-				.on(BLUR, self._blurHandler);
+			self.element = element = $('<ul id="' + strid() + '"/>')
+				.on(FOCUS + self._eventNS, proxy(self._focus, self))
+				.on(BLUR + self._eventNS, proxy(self._blur, self));
 
 			// apply width and/or height if specified
 			if (isDefined(options.width)) {
@@ -322,12 +359,10 @@
 			element.attr(TABINDEX, isDefined(originalTabindex) ? originalTabindex : "0");
 
 	        // add the keydown handler for the element
-	        self._keydownHandler = proxy(self._keydown, self);
-	        element.on(KEYDOWN, self._keydownHandler);
+	        element.on(KEYDOWN + self._eventNS, proxy(self._keydown, self));
 
 	        // the handler for data source on change
-	        self._dsChangeHandler = proxy(self._dsChange, self);
-	        self.dataSource.on(CHANGE, self._dsChangeHandler);
+	        self.dataSource.on(CHANGE + self._eventNS, proxy(self._dsChange, self));
 
 			// if values option specified, save them in a member to apply it when the DS load is done
 			// NOTE: do that only one time
@@ -337,6 +372,12 @@
 			else if (isDefined(selected)) {
 				self._initSelected = selected;
 			}
+
+            // add any WAI-ARIA tags
+            element.attr(ROLE, LISTBOX);
+            if (options.multiple) {
+                element.attr("aria-multiselectable", TRUE);
+            }
 
 			// refresh the data source if specified (this will cause redraw of all items)
 			if (options.readDataSource) {
@@ -398,33 +439,6 @@
 			}
 	    },
 
-	    _keydown: function (event) {
-	        var self = this,
-				prevent = true;
-
-	        switch (event.keyCode) {
-	            case keyCode.UP:
-	                self._move("up", event);
-	                break;
-	            case keyCode.DOWN:
-	                self._move("down", event);
-	                break;
-	            case keyCode.SPACE:
-	                self._toggleActive(event);
-	                break;
-	            case keyCode.ENTER:
-	                self._toggleActive(event);
-	                break;
-	            default:
-	                prevent = false;
-	                break;
-	        }
-
-	        if (prevent) {
-	            event.preventDefault();
-	        }
-	    },
-
 	    _render: function () {
 	        var self = this,
 				options = self.options,
@@ -432,6 +446,7 @@
 				element = $(self.element),
 				utype = self._utype,
 				original = self._original,
+                idPrefix = element.attr(ID) + "_opt",
 				originalInputValue = utype == UTYPE_INPUT ? self._original.val() : UNDEFINED;
 
 	        // empty the rendering element
@@ -452,7 +467,7 @@
 				each(data, function(index, item) {
 					var itemValue = shieldFormat.call(self, options.valueTemplate, item),
                         itemText = shieldFormat.call(self, options.textTemplate, item),
-						listItem = $("<li>" + itemText + "</li>")
+						listItem = $('<li id="' + idPrefix + index + '" role="option">' + itemText + '</li>')
 							.addClass("sui-listbox-item sui-unselectable")
 							// WARNING: do not add unselectable="on" because this will 
 							// break blur+focus events in IE and we want to handle those
@@ -465,13 +480,17 @@
 
 								// trigger a custom itemclick event for widgets that aggregate the listbox 
 								// such as: ComboBox and AutoComplete
-								self.trigger("itemclick", {index: index, item: item});
+								self.trigger(ITEMCLICK, {index: index, item: item});
 							})
 							.on(SELECTSTART, function() { return false; })
 							.data(LB_ITEM_DATA_KEY, item)
 							.data(LB_ITEM_INDEX_KEY, index)
 							.data(LB_ITEM_VALUE_KEY, itemValue)
 							.data(LB_ITEM_TEXT_KEY, itemText);
+
+                        if (options.multiple) {
+                            listItem.attr(ARIA_SELECTED, FALSE);
+                        }
 
 					// append the item element LI
 					element.append(listItem);
@@ -488,6 +507,39 @@
 				});
 			}
 		},
+
+	    _keydown: function (event) {
+	        var self = this,
+				prevent = true;
+
+	        switch (event.keyCode) {
+	            case keyCode.UP:
+	                self._move("up", event);
+	                break;
+	            case keyCode.DOWN:
+	                self._move("down", event);
+	                break;
+                case keyCode.HOME:
+                    self._move("first", event);
+                    prevent = false;
+                    break;
+                case keyCode.END:
+                    self._move("last", event);
+                    prevent = false;
+                    break;
+	            case keyCode.SPACE:
+	            case keyCode.ENTER:
+	                self._toggleActive(event);
+	                break;
+	            default:
+	                prevent = false;
+	                break;
+	        }
+
+	        if (prevent) {
+	            event.preventDefault();
+	        }
+	    },
 
 	    _move: function (dir, event) {
 	        var self = this,
@@ -507,6 +559,9 @@
 	            if (activeElement.prev().length > 0) {
 	                newActiveElement = activeElement.prev();
 	            }
+                else if (activeElement.length > 0) {
+	                newActiveElement = activeElement;
+	            }
 	        }
 	        else if (dir == "down") {
 	            if (activeElement.next().length > 0) {
@@ -516,6 +571,12 @@
 	                newActiveElement = activeElement;
 	            }
 	        }
+            else if (dir == "first") {
+                newActiveElement = element.find(".sui-listbox-item").first();
+            }
+            else if (dir == "last") {
+                newActiveElement = element.find(".sui-listbox-item").last();
+            }
 
 			// if no active element, return
 			if (newActiveElement.length <= 0) {
@@ -571,14 +632,23 @@
 
 	    _setActive: function (element) {
 	        element.addClass("sui-listbox-item-active").siblings().removeClass("sui-listbox-item-active");
+
+            $(this.element).attr(ARIA_ACTIVEDESCENDANT, element.attr(ID));
 	    },
 
 	    _setSelected: function (element) {
-	        element.addClass("sui-listbox-item-selected");
+	        element.addClass("sui-listbox-item-selected").attr(ARIA_SELECTED, TRUE);
 	    },
 
 	    _unsetSelected: function (element) {
 	        element.removeClass("sui-listbox-item-selected");
+
+            if (this.options.multiple) {
+                element.attr(ARIA_SELECTED, FALSE);
+            }
+            else {
+                element.removeAttr(ARIA_SELECTED);
+            }
 	    },
 
 	    _toggleActive: function (event) {
@@ -619,9 +689,10 @@
 	    _select: function (element, bSkipEvent) {
 	        var self = this,
 				original = self._original,
-				utype = self._utype;
+				utype = self._utype,
+                multiple = self.options.multiple;
 
-	        if (!self.options.multiple) {
+	        if (!multiple) {
 	            self.clearSelection();
 	        }
 
@@ -808,6 +879,7 @@
 		clearSelection: function() {
 			var self = this,
 				original = self._original,
+                multiple = self.options.multiple,
 				utype = self._utype;
 
 			if (utype == UTYPE_SELECT) {
@@ -819,26 +891,31 @@
 				original.removeAttr(VALUE);
 			}
 
-			$(self.element).find(".sui-listbox-item-selected").removeClass("sui-listbox-item-selected sui-listbox-item-active");
+            $(self.element).find(".sui-listbox-item-selected").each(function() {
+                $(this).removeClass("sui-listbox-item-selected sui-listbox-item-active");
+                if (multiple) {
+                    $(this).attr(ARIA_SELECTED, FALSE);
+                }
+                else {
+                    $(this).removeAttr(ARIA_SELECTED);
+                }
+            });
 		},
 
         // listbox destructor
 	    destroy: function () {
-	        var self = this;
+	        var self = this,
+                eventNS = self._eventNS;
 
             self._dsLoadedOnce = false;
 
 			$(self.element)
-				.off(FOCUS, self._focusHandler)
-				.off(BLUR, self._blurHandler)
+                .off(eventNS)
 				.remove();
 
 			if (self.dataSource) {
-				self.dataSource.off(CHANGE, self._dsChangeHandler);
+				self.dataSource.off(CHANGE + eventNS);
 			}
-
-			// reset all handlers
-			self._dsChangeHandler = self._focusHandler = self._blurHandler = null;
 
 			// unwrap the underlying element and show it
 			if (self._isWrapped) {
@@ -885,6 +962,8 @@
 				value = options.value,
 				element = $(self.element);
 
+            self._eventNS = ".shieldTextBox" + self.getInstanceId();
+
 	        element.addClass("sui-input");
 
 	        // init the autoComplete if any
@@ -896,11 +975,15 @@
 				element.addClass(cls);
 			}
 
-	        self._focusHandler = proxy(self._focus, self);
-	        element.on(FOCUS, self._focusHandler);
+	        element
+                .on(FOCUS + self._eventNS, proxy(self._focus, self))
+	            .on(BLUR + self._eventNS, proxy(self._blur, self));
 
-	        self._blurHandler = proxy(self._blur, self);
-	        element.on(BLUR, self._blurHandler);
+            // ARIA
+            element.attr(ROLE, TEXTBOX);
+            if (getUType(element) == UTYPE_TEXTAREA) {
+                element.attr(ARIA_MULTILINE, TRUE);
+            }
 
 	        // initialize the disabled state
 	        self.enabled(options.enabled);
@@ -1003,11 +1086,8 @@
 	        clearInterval(self.interval);
 
 	        self.element
-                .off(FOCUS, self._focusHandler)
-				.off(BLUR, self._blurHandler)
+                .off(self._eventNS)
 				.removeClass("sui-input" + (clsOption ? (" " + clsOption) : ""));
-
-			self._focusHandler = self._blurHandler = null;
 
 	        // destroy the autoComplete if any
 	        if (autoComplete) {
@@ -1031,13 +1111,17 @@
         open: false,				// whether to open the suggestion list initially
         delay: 200,					// the delay in ms between a keystroke and the data source update (search)
         minLength: 2,				// the minimum length of the input string to search for
-		animation: {
+        dropDownWidth: UNDEFINED,	// dropdown width
+        appendListBoxTo: "body",    // where to append the listbox to; undefined means BODY
+        animation: {
 			enabled: true,			// enable suggestion list animation
 			openDelay: 200,			// animation delay for showing the suggestion list
 			closeDelay: 100			// animation delay for hiding the suggestion list
 		},
         events: {
             // change
+            // select
+            // search
         }
     };
 	// Public properties: NONE
@@ -1053,7 +1137,8 @@
 				element = $(self.element),
 				options = self.options,
 				dataSourceOpts = options.dataSource,
-				dieOnError = options.dieOnError;
+				dieOnError = options.dieOnError,
+                appendListBoxTo = options.appendListBoxTo;
 
 	        self.pending = 0;
 			self.oldValue = element.val();
@@ -1074,13 +1159,16 @@
 	            return;
 	        }
 
+            // generate an instance-unique event namespace
+            self._eventNS = ".shieldAutoComplete" + self.getInstanceId();
+
 			// add the textbox class for the element
 			element.addClass("sui-input");
 
 			// add the autoComplete's listbox source element
 			// it will be hidden from the ListBox class anyway
 			self.listElement = $("<span/>")
-				.appendTo(doc.body);
+				.appendTo($(appendListBoxTo));
 
 			// init the ListBox which will hold the suggestions list appearing below the input
 			self.listBox = new ListBox(self.listElement, {
@@ -1089,10 +1177,11 @@
 				readDataSource: false,	// do not refresh the data source on init (only on search)
 				textTemplate: options.textTemplate,
 				multiple: false,
-				width: element.innerWidth(),
+				width: options.dropDownWidth || element.innerWidth(),
 				events: {
 					select: function(event) {
                         self._value(shieldFormat.call(self, options.valueTemplate, event.item));
+                        self.trigger(SELECT, {item: event.item});
 					},
 					itemclick: function(event) {
 						element.focus();
@@ -1109,20 +1198,29 @@
             // set the data source property
             self.dataSource = self.listBox.dataSource;
 
-			// add input keydown handler
-			self._inputKeydownHandler = proxy(self._inputKeydown, self);
-			element.on(KEYDOWN, self._inputKeydownHandler);
+			// add input keydown handler and 
+            // an input blur handler with a delay of 100 ms
+			element
+                .on(KEYDOWN + self._eventNS, proxy(self._inputKeydown, self))
+                .on(BLUR + self._eventNS, proxy(self._inputBlur, self, 100));
 
-			// add input blur handler with a delay of 100 ms
-			self._inputBlurHandler = proxy(self._inputBlur, self, 100);
-			element.on(BLUR, self._inputBlurHandler);
+            // ARIA for autocomplete
+            element
+                .attr(ARIA_AUTOCOMPLETE, "list")
+                .attr(ARIA_CONTROLS, self.listBox.element.attr(ID))
+                .attr(ARIA_HASPOPUP, self.listBox.element.attr(ROLE));
+
+            // ARIA for textbox
+            element.attr(ROLE, TEXTBOX);
+            if (getUType(element) == UTYPE_TEXTAREA) {
+                element.attr(ARIA_MULTILINE, TRUE);
+            }
 
 	        // add list box data source change handler
-	        self._dsChangeHandler = proxy(self._dsChange, self);
-	        self.listBox.dataSource.on(CHANGE, self._dsChangeHandler);
+	        self.listBox.dataSource.on(CHANGE + self._eventNS, proxy(self._dsChange, self));
 
 			// add a window resize handler
-			$(win).on(RESIZE + ".shieldAutoComplete" + self.getInstanceId(), proxy(self._position, self));
+			$(win).on(RESIZE + self._eventNS, proxy(self._position, self));
 
 	        self._open = false;
 			if (options.open) {
@@ -1137,7 +1235,7 @@
 
 			// check to see if the old value was changed and if so, fire a change event
 			if (self.oldValue !== newValue) {
-				self.trigger(CHANGE);
+				self.trigger(CHANGE, {value: self._value()});
 				self.oldValue = newValue;
 			}
 		},
@@ -1213,6 +1311,7 @@
 
 	        self.searchTimeout = setTimeout(function () {
 	            if (self.term !== self._value()) {
+                    self.trigger("search", {value: self._value()});
 	                self._search();
 	            }
 	        }, self.options.delay);
@@ -1262,19 +1361,18 @@
 	    },
 
 		_position: function() {
-			var self = this,
+            var self = this,
 				element = $(self.element),
-				listBoxElement = $(self.listBox.element),
-				inputOffset = element.offset(),
-				inputHeight = element.outerHeight();
+                listBoxElement = $(self.listBox.element);
 
-			// position the autocomplete suggestion list right below the input,
-            // and set its width to the current width of the input
-			listBoxElement.css({
-				top: inputOffset.top + inputHeight,
-				left: inputOffset.left,
-                width: element.innerWidth()
-			});
+            listBoxElement.width(self.options.dropDownWidth || element.innerWidth());
+
+            // position the autocomplete suggestion list right below the input
+            Position.Set(listBoxElement, element, {
+                source: "left top",
+                target: "left bottom",
+                overflow: "none"
+            });
 		},
 
 	    _showItemList: function () {
@@ -1283,16 +1381,27 @@
 				listBoxElement = $(listBox.element),
 				animation = self.options.animation;
 
+            // NOTE: place this in the upper left corner to minimize positioning
+            // errors caused by appearing scrollbars
+            listBoxElement.css({
+                top: 0,
+                left: 0
+            });
+
+            // show the suggestion list box
+            listBoxElement.show();
+
 			// position the suggestion list right below the input
 			self._position();
 
 			// show with animation or not;
 			// make sure the selected element is visible
-			if (animation && animation.enabled) {
-				listBoxElement.slideDown(animation.openDelay, proxy(listBox.ensureActiveViewableINTERNAL, listBox));
+			if (!self._open && animation && animation.enabled) {
+				listBoxElement
+                    .hide()
+                    .slideDown(animation.openDelay, proxy(listBox.ensureActiveViewableINTERNAL, listBox));
 			}
 			else {
-				listBoxElement.show();
 				listBox.ensureActiveViewableINTERNAL();
 			}
 
@@ -1342,21 +1451,16 @@
             self.dataSource = null;
 
 			if (self.listBox) {
-				self.listBox.dataSource.off(CHANGE, self._dsChangeHandler);
-				self._dsChangeHandler = null;
+				self.listBox.dataSource.off(CHANGE + self._eventNS);
 				self.listBox.destroy();
 				self.listBox = null;
-
 			}
 
 	        self.element
-                .off(KEYDOWN, self._inputKeydownHandler)
-				.off(BLUR, self._inputBlurHandler)
+                .off(self._eventNS)
 				.removeClass("sui-input");
 
-			$(win).off(RESIZE + ".shieldAutoComplete" + self.getInstanceId());
-
-			self._inputKeydownHandler = self._inputBlurHandler = null;
+			$(win).off(RESIZE + self._eventNS);
 
 			if (self.listElement) {
 				self.listElement.remove();
@@ -1458,6 +1562,9 @@
                 return;
             }
 
+            // instance event namespace
+            self._eventNS = ".shieldNumericTextBox" + self.getInstanceId();
+
             // init a wrapper element to contain the elements rendering the combobox;
 			// put the original underlying element inside it;
 			// also put a text value input or a div, and a check div to show/hide the dd arrow
@@ -1492,11 +1599,9 @@
 
             // call the focus and blur private methods whenever the 
             // text display element is being focused or blurred
-            self._focusHandler = proxy(self._focus, self);
-            self._blurHandler = proxy(self._blur, self);
             textElement
-                .on(FOCUS, self._focusHandler)
-                .on(BLUR, self._blurHandler);
+                .on(FOCUS + self._eventNS, proxy(self._focus, self))
+                .on(BLUR + self._eventNS, proxy(self._blur, self));
 
             // add the spinners if allowed
             if (spinners) {
@@ -1505,28 +1610,28 @@
                 self._onSpinDownMDProxy = proxy(self._spinDownMD, self);
                 self._onSpinnerMUProxy = proxy(self._spinnerMU, self);
 
-                self.spinUp = spinUp = $('<span class="sui-spinner sui-spinner-up sui-unselectable" />')
-                    .html('<span class="sui-caret-up sui-unselectable" unselectable="on" />')
+                self.spinUp = spinUp = $('<span class="sui-spinner sui-spinner-up sui-unselectable"/>')
+                    .html('<span class="sui-caret-up sui-unselectable" unselectable="on"/>')
                     .attr(UNSELECTABLE, ON)
                     .attr(ALT, labelIncrease)
                     .attr(TITLE, labelIncrease)
-                    .on(MOUSEDOWN, self._onSpinUpMDProxy)
-                    .on(MOUSEUP, self._onSpinnerMUProxy)
-                    .on(MOUSEOUT, self._onSpinnerMUProxy)
-					.on(SELECTSTART, function() { return false; });
+                    .on(MOUSEDOWN + self._eventNS, self._onSpinUpMDProxy)
+                    .on(MOUSEUP + self._eventNS, self._onSpinnerMUProxy)
+                    .on(MOUSEOUT + self._eventNS, self._onSpinnerMUProxy)
+					.on(SELECTSTART + self._eventNS, function() { return false; });
 
-                self.spinDown = spinDown = $('<span class="sui-spinner sui-spinner-down sui-unselectable" />')
-                    .html('<span class="sui-caret-down sui-unselectable" unselectable="on" />')
+                self.spinDown = spinDown = $('<span class="sui-spinner sui-spinner-down sui-unselectable"/>')
+                    .html('<span class="sui-caret-down sui-unselectable" unselectable="on"/>')
                     .attr(UNSELECTABLE, ON)
                     .attr(ALT, labelDecrease)
                     .attr(TITLE, labelDecrease)
-                    .on(MOUSEDOWN, self._onSpinDownMDProxy)
-                    .on(MOUSEUP, self._onSpinnerMUProxy)
-                    .on(MOUSEOUT, self._onSpinnerMUProxy)
-					.on(SELECTSTART, function() { return false; });
+                    .on(MOUSEDOWN + self._eventNS, self._onSpinDownMDProxy)
+                    .on(MOUSEUP + self._eventNS, self._onSpinnerMUProxy)
+                    .on(MOUSEOUT + self._eventNS, self._onSpinnerMUProxy)
+					.on(SELECTSTART + self._eventNS, function() { return false; });
 
                 element.append(
-                    $('<span class="sui-spinners" />').append(
+                    $('<span class="sui-spinners"/>').append(
                         spinUp,
                         spinDown
                     )
@@ -1534,8 +1639,7 @@
             }
 
 	        // add the keydown handler for the element
-	        self._keydownHandler = proxy(self._keydown, self);
-	        textElement.on(KEYDOWN, self._keydownHandler);
+	        textElement.on(KEYDOWN + self._eventNS, proxy(self._keydown, self));
 
             // add the core and optional classes
             element.addClass("sui-numeric-textbox" + (spinners ? "" : " sui-numeric-textbox-nosp") + (cls ? (" " + cls) : ""));
@@ -1551,6 +1655,12 @@
             if (!isDefined(options.valueTemplate)) {
                 options.valueTemplate = "{0:n" + stepDecimalDigits + "}";
             }
+
+            // ARIA
+            element
+                .attr(ROLE, "spinbutton")
+                .attr(ARIA_VALUEMIN, options.min)
+                .attr(ARIA_VALUEMAX, options.max);
 
             // init the enabled state
             self.enabled(options.enabled);
@@ -1660,8 +1770,14 @@
 				case keyCode.TAB:
                 case keyCode.LEFT:
                 case keyCode.RIGHT:
+                    break;
                 case keyCode.END:
+                    self._updateValue("max", false);
+                    event.preventDefault();
+                    break;
                 case keyCode.HOME:
+                    self._updateValue("min", false);
+                    event.preventDefault();
                     break;
                 case keyCode.ESC:
                     if (enabled) {
@@ -1670,11 +1786,11 @@
                     event.preventDefault();
 					break;
 	            case keyCode.UP:
-                    self._updateValue(true, false);
+                    self._updateValue("inc", false);
 					event.preventDefault();
 	                break;
 	            case keyCode.DOWN:
-					self._updateValue(false, false);
+					self._updateValue("dec", false);
 					event.preventDefault();
 	                break;
 	            default:
@@ -1712,7 +1828,7 @@
 
             event.preventDefault();
 
-            self._updateValue(true, false);
+            self._updateValue("inc", false);
 
             self._spinUpCancel = false;
 
@@ -1720,7 +1836,7 @@
             // start a timer which will update the value
             setTimeout(function() {
                 if (!self._spinUpInt && !self._spinUpCancel) {
-                    self._spinUpInt = setInterval(proxy(self._updateValue, self, true, false), 20);
+                    self._spinUpInt = setInterval(proxy(self._updateValue, self, "inc", false), 20);
                 }
             }, 100);
         },
@@ -1731,13 +1847,13 @@
 
             event.preventDefault();
 
-            self._updateValue(false, false);
+            self._updateValue("dec", false);
 
             self._spinDownCancel = false;
 
             setTimeout(function() {
                 if (!self._spinDownInt && !self._spinDownCancel) {
-                    self._spinDownInt = setInterval(proxy(self._updateValue, self, false, false), 20);
+                    self._spinDownInt = setInterval(proxy(self._updateValue, self, "dec", false), 20);
                 }
             }, 100);
         },
@@ -1770,7 +1886,7 @@
             }
         },
 
-        _updateValue: function(bInc, bSkipEvent, setFocus) {
+        _updateValue: function(type, bSkipEvent, setFocus) {
             var self = this,
                 options = self.options,
                 min = options.min,
@@ -1802,19 +1918,27 @@
             bSkipEvent = isDefined(bSkipEvent) ? !!bSkipEvent : true;
 			setFocus = isDefined(setFocus) ? !!setFocus : true;
 
-            if (bInc) {
+            if (type == "inc") {
                 // incrementing
                 if (value < max) {
                     self.value(value + step);
                     changed = true;
                 }
             }
-            else {
+            else if (type == "dec") {
                 // decrementing
                 if (value > min) {
                     self.value(value - step);
                     changed = true;
                 }
+            }
+            else if (type == "min") {
+                self.value(min);
+                changed = true;
+            }
+            else if (type == "max") {
+                self.value(max);
+                changed = true;
             }
 
             // set the focus to the text display element
@@ -1835,13 +1959,13 @@
         // public function to increment the numeric textbox value
         increment: function() {
             // increment value, don't fire an event and do not set the focus to the text element
-            this._updateValue(true, true, false);
+            this._updateValue("inc", true, false);
         },
 
         // public function to decrement the numeric textbox value
         decrement: function() {
             // decrement value, don't fire an event and do not set the focus to the text element
-            this._updateValue(false, true, false);
+            this._updateValue("dec", true, false);
         },
 
         // setter/getter for the numeric textbox value
@@ -1849,6 +1973,7 @@
             var self = this,
 				options = self.options,
 				args = [].slice.call(arguments),
+                element = self.element,
                 textElement = $(self.textElement),
                 value,
                 text;
@@ -1893,6 +2018,15 @@
 
                 // update the underlying element
                 self._value(value);
+
+                // ARIA
+                if (value !== null) {
+                    element.attr(ARIA_VALUENOW, value);
+                }
+                else {
+                    element.removeAttr(ARIA_VALUENOW);
+                }
+                element.attr(ARIA_VALUETEXT, htmlEncode(text));
 			}
 			else {
 				// getter
@@ -1953,30 +2087,20 @@
             // remove spinners-related stuff
             if (self.options.spinners) {
                 // remove the spinners event handlers
-                self.spinUp
-                    .off(MOUSEDOWN, self._onSpinUpMDProxy)
-                    .off(MOUSEUP, self._onSpinnerMUProxy)
-                    .off(MOUSEOUT, self._onSpinnerMUProxy)
-					.off(SELECTSTART);
+                $(self.spinUp)
+                    .off(self._eventNS)
+                    .remove();
 
-                self.spinDown 
-                    .off(MOUSEDOWN, self._onSpinDownMDProxy)
-                    .off(MOUSEUP, self._onSpinnerMUProxy)
-                    .off(MOUSEOUT, self._onSpinnerMUProxy)
-					.off(SELECTSTART);
-
-                // remove the spinners
-                $(self.spinUp).remove();
-                $(self.spinDown).remove();
+                $(self.spinDown)
+                    .off(self._eventNS)
+                    .remove();
 
                 self.spinUp = self.spinDown = null;
             }
 
             // remove the textElement and associated handlers
             $(self.textElement)
-                .off(KEYDOWN, self._keydownHandler)
-                .off(FOCUS, self._focusHandler)
-                .off(BLUR, self._blurHandler)
+                .off(self._eventNS)
                 .remove();
             self.textElement = null;
 
@@ -2061,6 +2185,9 @@
                 return;
             }
 
+            // instance-unique event namespace
+            self._eventNS = ".shieldMaskedTextBox" + self.getInstanceId();
+
             //add css style
             element.addClass("sui-input");
 
@@ -2075,35 +2202,20 @@
 				self.value(value);
 			}
 
-            self._focusHandler = proxy(self._focus, self);
-            element.on(FOCUS, self._focusHandler);
+            element
+                .on(FOCUS + self._eventNS, proxy(self._focus, self))
+                .on(BLUR + self._eventNS, proxy(self._blur, self))
+                .on(KEYDOWN + self._eventNS, proxy(self._keydown, self))
+                .on(KEYPRESS + self._eventNS, proxy(self._keypress, self))
+                .on(CUT + self._eventNS, proxy(self._cut, self))
+                .on(PASTE + self._eventNS, proxy(self._paste, self))
+                .on(DRAGSTART + self._eventNS, proxy(self._dragstart, self))
+                .on(DRAGENTER + self._eventNS, proxy(self._dragenter, self))
+                .on(DRAGOVER + self._eventNS, proxy(self._dragover, self))
+                .on(DROP + self._eventNS, proxy(self._drop, self));
 
-            self._blurHandler = proxy(self._blur, self);
-            element.on(BLUR, self._blurHandler);
-
-            self._keydownHandler = proxy(self._keydown, self);
-            element.on(KEYDOWN, self._keydownHandler);
-
-            self._keypressHandler = proxy(self._keypress, self);
-            element.on(KEYPRESS, self._keypressHandler);
-
-            self._cutHandler = proxy(self._cut, self);
-            element.on(CUT, self._cutHandler);
-
-            self._pasteHandler = proxy(self._paste, self);
-            element.on(PASTE, self._pasteHandler);
-
-            self._dragStartHandler = proxy(self._dragstart, self);
-            element.on(DRAGSTART, self._dragStartHandler);
-
-            self._dragEnterHandler = proxy(self._dragenter, self);
-            element.on(DRAGENTER, self._dragEnterHandler);
-
-            self._dragOverHandler = proxy(self._dragover, self);
-            element.on(DRAGOVER, self._dragOverHandler);
-
-            self._dropHandler = proxy(self._drop, self);
-            element.on(DROP, self._dropHandler);
+            // ARIA (not decided yet what the ARIA is for Masked Text Box)
+            element.attr(ROLE, TEXTBOX);
 
             // initialize the disabled state
             self.enabled(options.enabled);
@@ -2113,9 +2225,10 @@
             var self = this,
                 mask = self.options.mask,
                 target = "",
-                source;
+                source,
+                i;
 
-            for (var i = 0; i < mask.length; i++) {
+            for (i = 0; i < mask.length; i++) {
                 source = mask.charAt(i);
                 target += self._isCultureSpecific(source) ? self._getCultureSpecific(source) : source;
             }
@@ -2588,7 +2701,7 @@
                                 case 121: //Ctrl + Y (redo) 
                                 case 89:
                                 	if (code == 118 || code == 86) { // paste
-                                    	self._paste();
+                                    	self._paste(event);
                                 	}
                                 	else if (code == 122 || code == 90) { //undo
                                     	self._undo();
@@ -2809,20 +2922,9 @@
 				clsOption = self.options.cls;
 
             self.element
-                .off(FOCUS, self._focusHandler)
-				.off(BLUR, self._blurHandler)
-                .off(KEYDOWN, self._keydownHandler)
-                .off(KEYPRESS, self._keypressHandler)
-                .off(CUT, self._cutHandler)
-                .off(PASTE, self._pasteHandler)
-                .off(DRAGSTART, self._dragStartHandler)
-                .off(DRAGENTER, self._dragEnterHandler)
-                .off(DRAGOVER, self._dragOverHandler)
-                .off(DROP, self._dropHandler)
+                .off(self._eventNS)
 				.removeClass("sui-input" + (clsOption ? (" " + clsOption) : ""));
 
-            self._focusHandler = self._blurHandler = self._keydownHandler = self._keypressHandler = self._cutHandler = self._pasteHandler =
-            self._dragStartHandler = self._dragEnterHandler = self._dragOverHandler = self._dropHandler = null;
             Widget.fn.destroy.call(self);
         }
     });
@@ -2854,6 +2956,7 @@
 		height: UNDEFINED,			// optional height of the element
 		dropDownWidth: UNDEFINED,	// dropdown width
 		dropDownHeight:	200,		// maximum dropdown height
+        appendListBoxTo: "body",    // where to append the listbox to; undefined means BODY
 		animation: {
 			enabled: true,			// enable suggestion list animation
 			openDelay: 200,			// animation delay for showing the suggestion list
@@ -2888,13 +2991,15 @@
 				autoCompleteOpts = options.autoComplete,
 				selected = options.selected,
 				value = options.value,
+                appendListBoxTo = options.appendListBoxTo,
 				original,
 				originalTabindex,
                 originalPlaceholder,
 				element,
 				textElement,
 				ddElement,
-				autoCompleteFilter = UNDEFINED;
+				autoCompleteFilter,
+                listBoxParent;
 
 			// save the original element and its type
 			self._original = original = $(self.element);
@@ -2906,6 +3011,9 @@
 				error((editable ? "shieldComboBox" : "shieldDropDown") + ": No dataSource or underlying SELECT element found.", dieOnError);
 				return;
 			}
+
+            // instance unique event namespace
+            self._eventNS = ".shieldComboBox" + self.getInstanceId();
 
 			self.pending = 0;
 
@@ -2922,14 +3030,17 @@
 
 			// if editable, add an input for the text, otherwise add a span
 			if (editable) {
-				textElement = $('<input type="text" class="sui-input" />')
+				textElement = $('<input type="text" class="sui-input"/>')
 					.focus(function() {
 						$(this).parent().addClass("sui-combobox-focus");
 					})
 					.blur(function() {
 						$(this).parent().removeClass("sui-combobox-focus");
 						self._blur();
-					});
+					})
+                    // ARIA
+                    .attr(ROLE, TEXTBOX)
+                    .attr(ARIA_MULTILINE, FALSE);
 
                 // if underlying element has placeholder, add it to the text element too
                 originalPlaceholder = original.attr(PLACEHOLDER);
@@ -2942,17 +3053,17 @@
 				// even if no value is currently selected
 				textElement = $('<span class="sui-input sui-unselectable">&nbsp;</span>')
 					.attr(UNSELECTABLE, ON)
-					.on(CLICK, self._onDDHandler)
-					.on(SELECTSTART, function() { return false; });
+					.on(CLICK + self._eventNS, self._onDDHandler)
+					.on(SELECTSTART + self._eventNS, function() { return false; });
 			}
 			self.textElement = textElement;
 			textElement.appendTo(element);
 
 			// add the dropdown button element
-			self.ddElement = ddElement = $('<span class="sui-caret-container sui-unselectable" />')
-				.html('<span class="sui-caret sui-unselectable" unselectable="on" />')
+			self.ddElement = ddElement = $('<span class="sui-caret-container sui-unselectable"/>')
+				.html('<span class="sui-caret sui-unselectable" unselectable="on"/>')
 				.attr(UNSELECTABLE, ON)
-				.on(CLICK, self._onDDHandler)
+				.on(CLICK + self._eventNS, self._onDDHandler)
 				.appendTo(element);
 
 	        element.addClass(editable ? "sui-combobox" : "sui-dropdown");
@@ -2973,7 +3084,7 @@
 
 			// apply width and/or height if specified
 			if (isDefined(options.width)) {
-				element.width(options.width);
+				element.css(WIDTH, options.width);
 			}
 			if (isDefined(options.height)) {
 				element.css(HEIGHT, options.height);
@@ -2982,28 +3093,26 @@
 			}
 
 	        // add the keydown handler for the element
-	        self._keydownHandler = proxy(self._keydown, self);
-	        element.on(KEYDOWN, self._keydownHandler);
-
-            self._keyupHandler = proxy(self._keyup, self);
-            element.on(KEYUP, self._keyupHandler);
+	        element
+                .on(KEYDOWN + self._eventNS, proxy(self._keydown, self))
+                .on(KEYUP + self._eventNS, proxy(self._keyup, self));
 
             // focus handler
             self._focusHandler = proxy(self._focus, self);
             if (editable) {
-                textElement.on(FOCUS, self._focusHandler);
+                textElement.on(FOCUS + self._eventNS, self._focusHandler);
             }
             else {
-                element.on(FOCUS, self._focusHandler);
+                element.on(FOCUS + self._eventNS, self._focusHandler);
             }
 
 			// blur handler
-			self._blurHandler = proxy(self._blur, self);
-			element.on(BLUR, self._blurHandler);
+			element.on(BLUR + self._eventNS, proxy(self._blur, self));
 
 			// initialize a container element for the list of items (rendered in a ListBox)
+            // and append it to the proper parent element based on the appendListBoxTo option
 			self.listElement = $("<span/>")
-				.appendTo(doc.body);
+				.appendTo($(appendListBoxTo));
 
 			// add the autocomplete filter to dataSource options if needed
 			if (autoCompleteOpts) {
@@ -3072,6 +3181,9 @@
 
                         // hide the dropdown list of items
 						self._hideDD();
+
+                        // trigger an itemclick event for the combobox too, it might be needed for some other widgets internally like the editor
+                        self.trigger(ITEMCLICK, {index: event.index, item: event.item, text: event.text, value: event.value});
 					},
 					blur: function(event) {
                         // handle the blur after some delay, leaving enough time
@@ -3097,8 +3209,7 @@
             self.dataSource = self.listBox.dataSource;
 
 			// add list box data source change handler
-			self._dsChangeHandler = proxy(self._dsChange, self);
-			self.listBox.dataSource.on(CHANGE, self._dsChangeHandler);
+			self.listBox.dataSource.on(CHANGE + self._eventNS, proxy(self._dsChange, self));
 
             // NOTE: copy the templates from the listbox, in case they were not set for the
             // ComboBox and were left to default to the ListBox ones (which in turn depend on
@@ -3106,12 +3217,21 @@
             options.textTemplate = self.listBox.options.textTemplate;
             options.valueTemplate = self.listBox.options.valueTemplate;
 
+            // ARIA
+            element.attr(ROLE, "combobox");
+            if (editable) {
+                textElement.attr(ARIA_AUTOCOMPLETE, "list");
+                textElement.attr(ARIA_CONTROLS, self.listBox.element.attr(ID));
+                textElement.attr(ARIA_HASPOPUP, self.listBox.element.attr(ROLE));
+            }
+            // else - not editable ARIA ???
+
 			// update the data source for the first time
 			// NOTE: other initialization will be done in the _dsChange() below
 			self.listBox.dataSource.read();
 
 			// add a window resize handler
-			$(win).on(RESIZE + ".shieldComboBox" + self.getInstanceId(), proxy(self._position, self));
+			$(win).on(RESIZE + self._eventNS, proxy(self._position, self));
 
 	        // initialize the disabled state
 	        self.enabled(options.enabled);
@@ -3119,7 +3239,7 @@
 			// init the open state
 			self._open = false;
 			if (options.enabled && options.open) {
-				self._showDD();
+				self._showDD(true);
 			}
 
             self._destroyed = false;
@@ -3132,14 +3252,16 @@
 
         // override the base function for putting the combobox in focus
         focus: function() {
-            if (this.options.editable) {
+            var self = this;
+
+            if (self.options.editable) {
                 // combobox - focus the input
-                $(this.textElement).focus();
-                cursorAtEnd($(this.textElement));
+                $(self.textElement).focus();
+                cursorAtEnd($(self.textElement));
             }
             else {
                 // dropdown - focus the wrapper
-                $(this.element).focus();
+                $(self.element).focus();
             }
         },
 
@@ -3208,11 +3330,14 @@
 		},
 
         _keyup: function(event) {
-            var self = this;
+            var self = this,
+                eventKey = event.keyCode;
 
             // if editable combobox and the underlying element is an input, 
             // set its value to what is currently typed
-            if (self.options.editable && self._utype == UTYPE_INPUT) {
+            if (self.options.editable && self._utype == UTYPE_INPUT && 
+                eventKey != keyCode.UP && eventKey != keyCode.DOWN && eventKey != keyCode.ENTER && eventKey != keyCode.TAB
+            ) {
                 $(self._original).attr(VALUE, $(self.textElement).val());
             }
         },
@@ -3302,7 +3427,7 @@
 	        }
 
 	        if (!self.cancelSearch && self._hasData()) {
-	            self._showDD();
+	            self._showDD(true);
 	        }
 	        else {
 	            self._hideDD();
@@ -3351,6 +3476,9 @@
 				if (editable) {
 					// text element is input
 					self.textElement.val(input);
+
+                    // ARIA
+                    self.textElement.attr(ARIA_ACTIVEDESCENDANT, listBox.element.attr(ARIA_ACTIVEDESCENDANT));
 				}
 				else {
                     // text element is span
@@ -3362,6 +3490,9 @@
 				if (editable) {
 					// clear the text and value ???
 					self.textElement.val("");
+
+                    // ARIA
+                    self.textElement.removeAttr(ARIA_ACTIVEDESCENDANT);
 				}
 				else {
 					// we should never reach here, but do it in case there are no items in the dropdown list
@@ -3389,28 +3520,26 @@
 			else {
 				// show if any items
 				if (self._hasData()) {
-					self._showDD();
+					self._showDD(false);
 				}
 			}
 		},
 
 		_position: function() {
-			var self = this,
+            var self = this,
 				element = $(self.element),
-				listBoxElement = $(self.listBox.element),
-				inputOffset = element.offset(),
-				inputHeight = element.outerHeight();
+                listBoxElement = $(self.listBox.element);
 
-			// position the combobox dropdown list right below the input,
-            // and set its width to the rendering element width
-			listBoxElement.css({
-				top: inputOffset.top + inputHeight,
-				left: inputOffset.left,
-                width: element.innerWidth()
-			});
+            listBoxElement.width(self.options.dropDownWidth || element.innerWidth());
+
+            Position.Set(listBoxElement, element, {
+                source: "left top",
+                target: "left bottom",
+                overflow: "none"
+            });
 		},
 
-	    _showDD: function () {
+	    _showDD: function (disableAnimation) {
 	        var self = this,
 				listBox = self.listBox,
 				listBoxElement = $(listBox.element),
@@ -3420,20 +3549,32 @@
 				return;
 			}
 
-			// position the suggestion list right below the input
-			self._position();
+            // NOTE: place this in the upper left corner to minimize positioning
+            // errors caused by appearing scrollbars
+            listBoxElement.css({
+                top: 0,
+                left: 0
+            });
 
-			// show with animation or not;
-			// make sure the selected element is visible
-			if (animation && animation.enabled) {
-				listBoxElement.slideDown(animation.openDelay, proxy(listBox.ensureActiveViewableINTERNAL, listBox));
-			}
-			else {
-				listBoxElement.show();
+			// show the list box
+            listBoxElement.show();
+
+            // position the suggestion list right below the input
+            self._position();
+
+            if (!disableAnimation && animation && animation.enabled) {
+                listBoxElement
+                    .hide()
+                    .slideDown(animation.openDelay, proxy(listBox.ensureActiveViewableINTERNAL, listBox));
+            }
+            else {
 				listBox.ensureActiveViewableINTERNAL();
-			}
+            }
 
 	        self._open = true;
+
+            // ARIA
+            $(self.element).attr(ARIA_EXPANDED, TRUE);
 	    },
 
 		_hideDD: function() {
@@ -3450,6 +3591,9 @@
 			}
 
 			self._open = false;
+
+            // ARIA
+            $(self.element).attr(ARIA_EXPANDED, FALSE);
 		},
 
 		// setter/getter for the enabled state of the combobox control
@@ -3631,24 +3775,20 @@
             self._dsLoaded = false;
 
 			// remove internal event handlers
-			textElement.off(CLICK, self._onDDHandler);
-			ddElement.off(CLICK, self._onDDHandler);
+			textElement.off(self._eventNS);
+			ddElement.off(self._eventNS);
 			self._onDDHandler = null;
 
-			$(win).off(RESIZE + ".shieldComboBox" + self.getInstanceId());
+			$(win).off(RESIZE + self._eventNS);
 
-			element
-                .off(KEYDOWN, self._keydownHandler)
-                .off(KEYUP, self._keyupHandler)
-				.off(BLUR, self._blurHandler);
+			element.off(self._eventNS);
 
             // unset the data source property
             self.dataSource = null;
 
 			// remove the listbox
 			if (self.listBox) {
-				self.listBox.dataSource.off(CHANGE, self._dsChangeHandler);
-				self._dsChangeHandler = null;
+				self.listBox.dataSource.off(CHANGE + self._eventNS);
 				self.listBox.destroy();
 				self.listBox = null;
 			}
@@ -3657,9 +3797,6 @@
 			// remove the text and dd elements
 			textElement.remove();
 			ddElement.remove();
-
-            // reset handlers
-            self._keydownHandler = self._keyupHandler = self._blurHandler = null;
 
 			// at this point the original element should be the only child of its parent, 
 			// so unwrap and show it
@@ -3724,7 +3861,10 @@
 				options = self.options,
 				cls = options.cls;
 
-	        element.addClass("sui-button sui-unselectable");
+            // instance-unique event namespace
+            self._eventNS = ".shieldButton" + self.getInstanceId();
+
+	        element.addClass("sui-button");
 
 			if (cls) {
 				element.addClass(cls);
@@ -3733,8 +3873,10 @@
 	        // bind to the button element's click event - it should fire for
 	        // mouse clicks, space and enter keys when on focus
 	        // NOTE: not sure whether it will fire on touch
-	        self._clickHandler = proxy(self._click, self);
-	        element.on(CLICK, self._clickHandler);
+	        element.on(CLICK + self._eventNS, proxy(self._click, self));
+
+            // ARIA
+            element.attr(ROLE, BUTTON);
 
 	        // initialize the disabled state
 	        self.enabled(options.enabled);
@@ -3748,6 +3890,9 @@
 	            else {
 	                element.removeClass("sui-button-checked");
 	            }
+
+                // ARIA
+                element.attr(ARIA + "-pressed", self._checked ? TRUE : FALSE);
 	        }
 	    },
 
@@ -3765,6 +3910,9 @@
 	                else {
 	                    element.removeClass("sui-button-checked");
 	                }
+
+                    // ARIA
+                    element.attr(ARIA + "-pressed", self._checked ? TRUE : FALSE);
 	            }
 
 	            // trigger the click event
@@ -3788,6 +3936,9 @@
 					else {
 						element.removeClass("sui-button-checked");
 					}
+
+                    // ARIA
+                    element.attr(ARIA + "-pressed", self._checked ? TRUE : FALSE);
 				}
 			}
 			else {
@@ -3809,12 +3960,14 @@
 				if (bEnabled) {
 					element
 						.removeAttr(DISABLED)
-						.removeClass("sui-button-disabled");
+						.removeClass("sui-button-disabled")
+                        .removeAttr(ARIA_DISABLED);
 				}
 				else {
 					element
 						.attr(DISABLED, DISABLED)
-						.addClass("sui-button-disabled");
+						.addClass("sui-button-disabled")
+                        .attr(ARIA_DISABLED, TRUE);
 				}
 
 				self._enabled = bEnabled;
@@ -3831,16 +3984,179 @@
 				clsOption = self.options.cls;
 
 	        self.element
-                .removeClass("sui-button sui-button-checked sui-button-disabled sui-unselectable" + (clsOption ? (" " + clsOption) : ""))
-				.off(CLICK, self._clickHandler);
-
-	        self._clickHandler = null;
+                .off(CLICK + self._eventNS)
+                .removeClass("sui-button sui-button-checked sui-button-disabled" + (clsOption ? (" " + clsOption) : ""));
 
 	        Widget.fn.destroy.call(self);
 	    }
 	});
     Button.defaults = buttonDefaults;
     shield.ui.plugin("Button", Button);
+
+
+    /////////////////////////////////////////////////////////
+    // SplitButton widget
+    // default splitbutton settings
+    splitButtonDefaults = extend({}, buttonDefaults, {
+        /* inherited Button properties
+        enabled: true,	// whether the button will be enabled or disabled
+		cls: UNDEFINED,	// optional class to apply after applying core widget classes
+        toggle: false,	// is the button toggable (has 2 states or only one)
+        checked: false,	// whether the button is checked (only works with toggle: true)
+        */
+        menu: UNDEFINED,        // String, Array or jQuery identifying the UL to init the menu items from
+		dataSource: UNDEFINED,  // data source configuration for the menu items
+        events: {
+            // click - inherited from Button
+            // menuClick - see Menu for details
+        }
+	});
+	// Public methods (inherited from Button)
+	//		bool enabled()	/	void enabled(bEnabled)
+    //      bool visible()  /   void visible(boolVisible)
+	//		bool checked()	/	void checked(bChecked)
+    SplitButton = Button.extend({
+        init: function () {
+	        // call the parent init
+	        Button.fn.init.apply(this, arguments);
+
+            // if no contextmenu, return, leaving only the button defined
+            if (!shield.ui.ContextMenu) {
+                return;
+            }
+
+            // create the context-menu related stuff
+            var self = this,
+				element = $(self.element),
+				options = self.options,
+                menuOption = options.menu,
+				cls = options.cls;
+
+            // init the contextmenu handle
+            self._handle = $('<button type="button"><span class="sui-caret-down"/></button>');
+            element.after(self._handle);
+
+            self._handleButton = new Button(self._handle, {
+                cls: "sui-button-split-handle" + (cls ? (' ' + cls) : ''),
+                events: {
+                    click: function(e) {
+                        if (self.menu.visible()) {
+                            self.menu.visible(false);
+                        }
+                        else {
+                            // take the button offset to position the contextmenu,
+                            // which is added to the document
+                            var offset = $(element).offset();
+                            self.menu.visible(true, {x: offset.left, y: offset.top + $(element).outerHeight()});
+                        }
+                    }
+                }
+            });
+
+            // init the context menu
+            if (isDefined(menuOption)) {
+                self._menuElement = $(menuOption);
+            }
+            else {
+                self._menuElement = $('<ul/>');
+                self._customMenuElement = true;
+                self._handle.after(self._menuElement);
+            }
+
+            // ARIA - generate an ID for the context menu if not there
+            if (!self._menuElement.attr(ID)) {
+                self._menuElement.attr(ID, strid());
+            }
+
+            self.menu = new shield.ui.ContextMenu(self._menuElement, {
+                cls: "sui-button-split-menu",
+                dataSource: options.dataSource,
+                minWidth: element.outerWidth() + self._handle.outerWidth() - 2,
+                events: {
+                    click: proxy(self.trigger, self, "menuClick")
+                }
+            });
+
+            // ARIA (supplemental to Button's)
+            $(self._handle)
+                .attr(ARIA_HASPOPUP, TRUE)
+                .attr(ARIA_CONTROLS, self._menuElement.attr(ID));
+        },
+
+        // setter/getter for the enabled state of the SplitButton
+		enabled: function() {
+            var self = this;
+
+            if (arguments && arguments.length > 0) {
+                // setter
+                Button.fn.enabled.apply(self, arguments);
+                if (self._handleButton) {
+                    self._handleButton.enabled.apply(self._handleButton, arguments);
+                }
+                if (self.menu && !arguments[0]) {
+                    // hide the menu if disabling
+                    self.menu.visible(false);
+                }
+            }
+            else {
+                // getter
+                return Button.fn.enabled.apply(self, arguments);
+            }
+		},
+
+        // setter/getter for the visible state of the SplitButton
+        visible: function() {
+            var self = this;
+
+            if (arguments && arguments.length > 0) {
+                // setter
+                Button.fn.visible.apply(self, arguments);
+                if (self._handleButton) {
+                    self._handleButton.visible.apply(self._handleButton, arguments);
+                }
+                if (self.menu && !arguments[0]) {
+                    // hide the menu if hiding
+                    self.menu.visible(false);
+                }
+            }
+            else {
+                // getter
+                return Button.fn.visible.apply(self, arguments);
+            }
+        },
+
+        // SplitButton destructor
+        destroy: function() {
+            var self = this;
+
+            // destroy the context-menu related stuff
+            if (self.menu) {
+                self.menu.destroy();
+                self.menu = UNDEFINED;
+            }
+            if (self._menuElement) {
+                if (self._customMenuElement) {
+                    $(self._menuElement).remove();
+                    self._customMenuElement = UNDEFINED;
+                }
+                self._menuElement = UNDEFINED;
+            }
+
+            if (self._handleButton) {
+                self._handleButton.destroy();
+                self._handleButton = UNDEFINED;
+            }
+            if (self._handle) {
+                $(self._handle).remove();
+                self._handle = UNDEFINED;
+            }
+
+            // destroy the parent stuff
+            Button.fn.destroy.call(self);
+        }
+    });
+    SplitButton.defaults = splitButtonDefaults;
+    shield.ui.plugin("SplitButton", SplitButton);
 
 
     /////////////////////////////////////////////////////////
@@ -3857,9 +4173,9 @@
         }
     };
 	// Public methods:
-    //		bool enabled()	/	void enabled(bEnabled)
+    //		bool enabled()  /	void enabled(bEnabled)
     //      bool visible()  /   void visible(boolVisible)
-    //		bool checked()		/	void checked(newValue)
+    //		bool checked()  /	void checked(newValue)
 	// CheckBox class
 	CheckBox = Widget.extend({
 	    init: function () {
@@ -3867,33 +4183,41 @@
 				options,
 				label,
 				tabIndex,
-                wrapper;
-			
+                wrapper,
+                elementId;
+
 	        // call the parent init
 	        Widget.fn.init.apply(this, arguments);
-			
+
+            self._eventNS = ".shieldCheckBox" + self.getInstanceId();
+
 			options = self.options;
 
 			var element = $(self.element)
-				.addClass("sui-checkbox-input");				
+				.addClass("sui-checkbox-input");
+
+            // generate an ID for the element if none set
+            elementId = element.attr(ID);
+            if (!elementId) {
+                element.attr(ID, elementId = strid());
+            }
 
 			tabIndex = element.attr(TABINDEX);
-			element.attr(TABINDEX, "0");
             
             wrapper = self.wrapper = element
-                .wrap("<span class='sui-checkbox'/>").parent()
-                .attr(TABINDEX, tabIndex);
+                .wrap('<span class="sui-checkbox"/>').parent()
+                .attr(TABINDEX, isDefined(tabIndex) ? tabIndex : 0);
 
-	        var checkBoxElement = $("<span class='sui-checkbox-element sui-checkbox-unchecked' />");
+	        var checkBoxElement = $('<span class="sui-checkbox-element sui-checkbox-unchecked"/>');
 	        checkBoxElement.appendTo(wrapper);
 	        self.checkBoxElement = checkBoxElement;
 
-	        $("<span class='sui-checkmark' />").appendTo(checkBoxElement);
+	        $('<span class="sui-checkmark"/>').appendTo(checkBoxElement);
 
 	        if (options.label) {
-	            label = $("<label class='sui-checkbox-label' />");
+	            label = $('<label class="sui-checkbox-label"/>');
 	            label.appendTo(wrapper);
-	            label.attr("for", element.id);
+	            label.attr("for", elementId);
 	            label.get(0).innerHTML = options.label;
 	            if (options.enableLabelClick) {
 	                label.addClass("sui-checkbox-label-hover");
@@ -3902,7 +4226,7 @@
 	        else {
 	            label = element.parent().parent();
 	            if (label && !label.is('label')) {
-	                label = $('label[for="' + element.get(0).id + '"]');
+	                label = $('label[for="' + elementId + '"]');
 	            }
 
 	            if (label && options.enableLabelClick) {
@@ -3910,28 +4234,38 @@
 	            }
 	        }
 
+            // ARIA
+            wrapper.attr(ROLE, "checkbox");
+            if (label) {
+                var labelId = label.attr(ID);
+                if (!labelId) {
+                    label.attr(ID, labelId = strid());
+                }
+                wrapper.attr(ARIA_LABELLEDBY, labelId);
+            }
+
 	        if (element.attr(CHECKED)) {
 	            options.checked = true;
 	        }
+
 	        self.enabled(options.enabled);
 	        self.checked(options.checked);
 
-	        // bind to the checkbox element's click event
-	        self._clickHandler = proxy(self._click, self);
-	        checkBoxElement.on(CLICK, self._clickHandler);
+	        // bind to the wrapper's click event and 
+            // add the keydown handler for the element
+	        wrapper
+                .on(CLICK + self._eventNS, proxy(self._click, self))
+                .on(KEYDOWN + self._eventNS, proxy(self._keydown, self));
 
-	        // add the keydown handler for the element
-	        self._keydownHandler = proxy(self._keydown, self);
-	        checkBoxElement.on(KEYDOWN, self._keydownHandler);
-
-	        if (label && options.enableLabelClick) {
-	            // bind to the label's element's click event
-	            label.on(CLICK, self._clickHandler);
-	            label.on(KEYDOWN, self._keydownHandler);
+            if (label && options.enableLabelClick) {
+                // bind to the label's element's click event
+                label
+                    .on(CLICK + self._eventNS, proxy(self._click, self))
+                    .on(KEYDOWN + self._eventNS, proxy(self._keydown, self));
 	        }
 
-	        wrapper.onselectstart = function () { return false; }
-	        wrapper.onmousedown = function () { return false; }
+	        wrapper.onselectstart = function () { return false; };
+	        wrapper.onmousedown = function () { return false; };
 	    },
 
 	    _click: function (event) {
@@ -3992,18 +4326,19 @@
                 args = [].slice.call(arguments),
 	            element = $(self.element),
                 wrapper = self.wrapper,
-                checkmark = wrapper.find(".sui-checkmark");
+                checkmark = wrapper.find(".sui-checkmark"),
+                chChecked;
 
 	        if (args.length > 0) {
-
-	            var chChecked = args[0];
-
-	            self._checked = chChecked;
+	            self._checked = chChecked = args[0];
 
 	            if (chChecked) {
 	                wrapper.find(".sui-checkbox-element")
                         .removeClass("sui-checkbox-unchecked sui-checkbox-indeterminate")
                         .addClass("sui-checkbox-checked");
+
+                    // ARIA
+                    wrapper.attr(ARIA_CHECKED, TRUE);
 
 	                element.attr(CHECKED, CHECKED);
 	                element.data("1");
@@ -4016,6 +4351,9 @@
                         .removeClass("sui-checkbox-checked sui-checkbox-indeterminate")
                         .addClass("sui-checkbox-unchecked");
 
+                    // ARIA
+                    wrapper.attr(ARIA_CHECKED, FALSE);
+
 	                element.removeAttr(CHECKED);
 	                element.data("0");
 
@@ -4025,6 +4363,9 @@
 	                wrapper.find(".sui-checkbox-element")
                         .removeClass("sui-checkbox-checked sui-checkbox-unchecked")
                         .addClass("sui-checkbox-indeterminate");
+
+                    // ARIA
+                    wrapper.attr(ARIA_CHECKED, "mixed");
 
 	                element.removeAttr(CHECKED);
 	                element.data("2");
@@ -4075,14 +4416,13 @@
                 .removeAttr(TABINDEX);
 
 	        if (self.checkBoxElement) {
-	            self.checkBoxElement
-                    .off(CLICK, self._clickHandler);
+	            self.checkBoxElement.off(self._eventNS);
 	        }
 
 	        if (self.wrapper) {
 	            self.wrapper
                     .find(".sui-checkbox-label")
-                    .off(CLICK, self._clickHandler)
+                    .off(self._eventNS)
                     .end()
 					.removeAttr(DISABLED)
 					.removeClass("sui-checkbox-disabled")
@@ -4090,9 +4430,6 @@
 
 	            self.wrapper = null;
 	        }
-
-	        self._clickHandler = null;
-	        self._keydownHandler = null;
 
 	        Widget.fn.destroy.call(self);
 	    }
@@ -4116,41 +4453,48 @@
     // Public methods:
     //		bool enabled()	/	void enabled(bEnabled)
     //      bool visible()  /   void visible(boolVisible)
-    //		bool checked()		/	void checked(newValue)
+    //		bool checked()  /	void checked(newValue)
     // RadioButton class
     RadioButton = Widget.extend({
         init: function () {
-			var self = this,
-				options,
-				label,
-				tabIndex,
-                wrapper;
-				
             // call the parent init
             Widget.fn.init.apply(this, arguments);
-			
-			options = self.options;
-			
-			var element = self.element
-				.addClass("sui-radiobutton-input");
+
+            var self = this,
+                element = $(self.element),
+				options = self.options,
+				label,
+				tabIndex,
+                wrapper,
+                elementId;
+
+            // instnace-unique event namespace
+            self._eventNS = ".shieldRadioButton" + self.getInstanceId();
+
+			element.addClass("sui-radiobutton-input");
+
+            // generate an ID for the element if none set
+            elementId = element.attr(ID);
+            if (!elementId) {
+                element.attr(ID, elementId = strid());
+            }
 
             tabIndex = element.attr(TABINDEX);
-            element.attr(TABINDEX, "0");
-            
-            wrapper = self.wrapper = element.wrap("<span class='sui-radiobutton'/>").parent();
-            
-            wrapper.attr(TABINDEX, tabIndex);
 
-            var radioButtonElement = $("<span class='sui-radiobutton-element' />");
+            wrapper = self.wrapper = element.wrap('<span class="sui-radiobutton"/>').parent();
+
+            wrapper.attr(TABINDEX, isDefined(tabIndex) ? tabIndex : 0);
+
+            var radioButtonElement = $('<span class="sui-radiobutton-element"/>');
             radioButtonElement.appendTo(wrapper);
             self.radioButtonElement = radioButtonElement;
 
-            $("<span class='sui-checkmark' />").appendTo(radioButtonElement);
-            
+            $('<span class="sui-checkmark"/>').appendTo(radioButtonElement);
+
             if (options.label) {
-                label = $("<label class='sui-radiobutton-label' />");
+                label = $('<label class="sui-radiobutton-label"/>');
                 label.appendTo(wrapper);
-                label.attr("for", self.element.id);
+                label.attr("for", elementId);
                 label.get(0).innerHTML = options.label;
                 if (options.enableLabelClick) {
                     label.addClass("sui-radiobutton-label-hover");
@@ -4159,12 +4503,22 @@
             else {
                 label = element.parent().parent();
                 if (label && !label.is('label')) {
-                    label = $('label[for="' + element.get(0).id + '"]');
+                    label = $('label[for="' + elementId + '"]');
                 }
 
                 if (label && options.enableLabelClick) {
                     label.addClass("sui-radiobutton-label-hover");
                 }
+            }
+
+            // ARIA
+            wrapper.attr(ROLE, "radio");
+            if (label) {
+                var labelId = label.attr(ID);
+                if (!labelId) {
+                    label.attr(ID, labelId = strid());
+                }
+                wrapper.attr(ARIA_LABELLEDBY, labelId);
             }
 
             if (element.attr(CHECKED)) {
@@ -4180,28 +4534,28 @@
                 self._checked = false;
             }
 
-            if (options.enabled) {
-                // bind to the radiobutton element's click event
-                self._clickHandler = proxy(self._click, self);
-                radioButtonElement.on(CLICK, self._clickHandler);
+            // bind to the radiobutton element's click event
+            wrapper
+                .on(CLICK + self._eventNS, proxy(self._click, self))
+                .on(KEYDOWN + self._eventNS, proxy(self._keydown, self));
 
-                // add the keydown handler for the element
-                self._keydownHandler = proxy(self._keydown, self);
-                radioButtonElement.on(KEYDOWN, self._keydownHandler);
-
-                if (label && options.enableLabelClick) {
-                    // bind to the label's element's click event
-                    label.on(CLICK, self._clickHandler);
-                    label.on(KEYDOWN, self._keydownHandler);
-                }
+            if (label && options.enableLabelClick) {
+                // bind to the label's element's click event
+                label
+                    .on(CLICK + self._eventNS, proxy(self._click, self))
+                    .on(KEYDOWN + self._eventNS, proxy(self._keydown, self));
             }
 
-            wrapper.onselectstart = function () { return false; }
-            wrapper.onmousedown = function () { return false; }
+            wrapper.onselectstart = function () { return false; };
+            wrapper.onmousedown = function () { return false; };
         },
 
         _click: function (event) {
             var self = this;
+
+            if (!self._enabled) {
+	            return;
+	        }
 
             // always set this to checked 
             self.checked(true);
@@ -4249,20 +4603,27 @@
 
         _checkInternal: function (checked) {
             var self = this,
-				element = $(self.element);
+				element = $(self.element),
+                wrapper = self.wrapper;
 
             self._checked = checked;
 
             if (checked) {
-                self.wrapper.find(".sui-radiobutton-element")
+                wrapper.find(".sui-radiobutton-element")
                     .removeClass("sui-radiobutton-unchecked sui-radiobutton-indeterminate")
                     .addClass("sui-radiobutton-checked");
+
+                // ARIA
+                wrapper.attr(ARIA_CHECKED, TRUE);
 
                 element.attr(CHECKED, CHECKED);
             }
             else {
-                self.wrapper.find(".sui-radiobutton-element")
+                wrapper.find(".sui-radiobutton-element")
                     .removeClass("sui-radiobutton-checked");
+
+                // ARIA
+                wrapper.attr(ARIA_CHECKED, FALSE);
 
                 element.removeAttr(CHECKED);
             }
@@ -4291,7 +4652,6 @@
 				element = $(self.element);
 
             if (args.length > 0) {
-
                 var rbEnabled = !!args[0];
 
                 if (rbEnabled) {
@@ -4323,33 +4683,23 @@
                 .removeAttr(TABINDEX);
 
             if (self.radioButtonElement) {
-                self.radioButtonElement
-                    .off(CLICK, self._clickHandler);
-                self.radioButtonElement
-                    .off(KEYDOWN, self._keydownHandler);
+                self.radioButtonElement.off(self._eventNS);
+                self.radioButtonElement = null;
             }
 
-            self.radioButtonElement = null;
-
             if (self.wrapper) {
-                var label = self.label;
-                if(label) {
-                    label.off(CLICK, self._clickHandler);
-                    label.off(KEYDOWN, self._keydownHandler);
+                if (self.label) {
+                    self.label.off(self._eventNS);
+                    self.label = null;
                 }
-                self.label = null;
 
 				self.wrapper
 					.removeAttr(DISABLED)
 					.removeClass("sui-radiobutton-disabled");
 
 				self.wrapper.replaceWith(self.element);
-
 				self.wrapper = null;				
             }
-
-            self._clickHandler = null;
-            self._keydownHandler = null;
 
             Widget.fn.destroy.call(self);
         }
@@ -4401,6 +4751,9 @@
 				return;
             }
 
+            // instance-unique event namespace
+            self._eventNS = ".shieldSwitch" + self.getInstanceId();
+
             self.element = element = original.wrap('<div class="sui-switch sui-unselectable' + (cls ? (' ' + cls) : '') + '" />').parent();
 
             inner = $('<div class="sui-switch-inner sui-unselectable" />').appendTo(element);
@@ -4414,13 +4767,14 @@
 			originalTabindex = original.attr(TABINDEX);
 			element.attr(TABINDEX, isDefined(originalTabindex) ? originalTabindex : "0");
 
-            self._clickProxy = proxy(self._click, self);
-            self.element.on(CLICK, self._clickProxy);
-
-            self._keydownProxy = proxy(self._keydown, self);
-            self.element.on(KEYDOWN, self._keydownProxy);
+            element
+                .on(CLICK + self._eventNS, proxy(self._click, self))
+                .on(KEYDOWN + self._eventNS, proxy(self._keydown, self));
 
             checked = isDefined(checked) ? !!checked : !!original.attr(CHECKED);
+
+            // ARIA
+            element.attr(ROLE, SWITCH);
 
             self.checked(checked, false);
 
@@ -4489,9 +4843,13 @@
                     handle.animate({
                         'left': element.width() - handle.width() - 2
                     }, animationDuration, function() {
-                        element.addClass("sui-switch-checked");
+                        element
+                            .addClass("sui-switch-checked")
+                            .attr(ARIA_CHECKED, TRUE); // ARIA
+
                         if (isDefined(onText)) {
                             text.html(onText);
+                            element.attr(ARIA_LABEL, htmlEncode(onText));  // ARIA
                         }
                     });
 				}
@@ -4502,9 +4860,13 @@
                     handle.animate({
                         'left': -2
                     }, animationDuration, function() {
-                        element.removeClass("sui-switch-checked");
+                        element
+                            .removeClass("sui-switch-checked")
+                            .attr(ARIA_CHECKED, FALSE); // ARIA
+
                         if (isDefined(offText)) {
                             text.html(offText);
+                            element.attr(ARIA_LABEL, htmlEncode(offText));  // ARIA
                         }
                     });
 				}
@@ -4553,9 +4915,7 @@
         destroy: function() {
             var self = this;
 
-            $(self.element)
-                .off(CLICK, self._clickProxy)
-                .off(KEYDOWN, self._keydownProxy);
+            $(self.element).off(self._eventNS);
 
             $(self._inner).remove();
             $(self._handle).remove();
@@ -4564,7 +4924,7 @@
 				.unwrap()
 				.show();
 
-            self._clickProxy = self._keydownProxy = self._original = self._inner = self._handle = null;
+            self._original = self._inner = self._handle = null;
 
             Widget.fn.destroy.call(self);
         }

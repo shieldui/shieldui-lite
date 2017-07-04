@@ -57,3 +57,24 @@ test("Position.Set - top left at bottom right", function () {
     element.remove();
 });
 
+test("MouseTracker - Singleton", function () {
+    var mt1 = new shield.MouseTracker();
+    var mt2 = new shield.MouseTracker();
+    var mt3 = new shield.MouseTracker();
+
+    strictEqual(mt1, mt2);
+    strictEqual(mt1, mt3);
+    strictEqual(mt2, mt3);
+});
+
+test("DDManager - Register/UnRegister - droppable cleanup", function() {
+    strictEqual(shield.ui.DDManager.droppables["default"].length, 0);
+
+    var droppable = new shield.ui.Droppable();
+
+    strictEqual(shield.ui.DDManager.droppables["default"].length, 1);
+
+    droppable.destroy();
+
+    strictEqual(shield.ui.DDManager.droppables["default"].length, 0);
+});

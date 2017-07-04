@@ -1,2 +1,33 @@
-/* Shield UI Lite 1.7.10 | Copyright 2013-2016 Shield UI Ltd. | https://www.shieldui.com */
+/* Shield UI Lite 1.7.31 | Copyright 2013-2017 Shield UI Ltd. | https://www.shieldui.com */
+
+/*Shield UI Lite
+
+Copyright (c) 2013-2017 ShieldUI Ltd., https://www.shieldui.com
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+====
+
+All files located in the node_modules, bower_components and external 
+directories are externally maintained libraries used by this software which 
+have their own licenses; we recommend you read them, as their terms may 
+differ from the terms above.
+*/
+
 .sui-unselectable{user-select:none;-webkit-user-select:none;-khtml-user-select:none;-moz-user-select:none;-o-user-select:none;-ms-user-select:none;-webkit-touch-callout:none}.sui-sprite{background-image:url(../img/shieldui-sprite.png);background-repeat:no-repeat;width:16px;height:16px}.sui-resizable{position:relative}.sui-resizable-handle{position:absolute}.sui-resizable-dir-e{cursor:ew-resize}.sui-resizable-dir-w{cursor:ew-resize}.sui-resizable-dir-n{cursor:ns-resize}.sui-resizable-dir-s{cursor:ns-resize}.sui-resizable-dir-se{cursor:nwse-resize}.sui-resizable-dir-sw{cursor:nesw-resize}.sui-resizable-dir-ne{cursor:nesw-resize}.sui-resizable-dir-nw{cursor:nwse-resize}.sui-resizable-disabled .sui-resizable-dir-e,.sui-resizable-disabled .sui-resizable-dir-w,.sui-resizable-disabled .sui-resizable-dir-n,.sui-resizable-disabled .sui-resizable-dir-s,.sui-resizable-disabled .sui-resizable-dir-se,.sui-resizable-disabled .sui-resizable-dir-sw,.sui-resizable-disabled .sui-resizable-dir-ne,.sui-resizable-disabled .sui-resizable-dir-nw{cursor:default}.sui-draggable-dragging{cursor:move}.sui-draggable-disabled,.sui-draggable-dragging.sui-draggable-disabled{cursor:default}

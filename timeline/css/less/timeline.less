@@ -1,0 +1,112 @@
+/* Import the theme */
+@import "../../../common/less/themes/@{theme}.less";
+
+/* Timeline styles */
+.sui-timeline {
+	position: relative;
+	display: block;
+	color: @text-color;
+    background-color: @background-color;
+	border: 1px solid @border-color;
+	margin: 0px;
+	padding: 0px;
+	outline: 0;
+	font-size: @font-size;
+	font-family: @font-family;
+	line-height: normal;
+	overflow: hidden;
+	vertical-align: top;
+}
+.sui-timeline-collapsible {
+}
+.sui-timeline-inner {
+	display: block;
+    position: relative;
+    height: 100%;
+    overflow: auto;
+	overflow-x: hidden;
+}
+.sui-timeline-left .sui-timeline-inner {
+	padding-left: 1em;
+}
+.sui-timeline-right .sui-timeline-inner {
+	padding-right: 1em;
+}
+.sui-timeline-axis {
+    position: relative;
+    min-height: 100%;
+    width: 4px;
+    background: @primary-background-color;
+}
+.sui-timeline-axis-left {
+    float: left;
+}
+.sui-timeline-axis-centered {
+    margin: auto;
+}
+.sui-timeline-axis-right {
+    float: right;
+}
+.sui-timeline-event {
+    position: relative;
+	min-width: 100px;
+	padding-top: 0.8em;
+    padding-bottom: 1.2em;
+}
+.sui-timeline-event-left {
+}
+.sui-timeline-event-collapsible {
+}
+.sui-timeline-event-collapsed {
+	
+}
+.sui-timeline-event-icon {
+	display: inline-block;
+	position: absolute;
+	margin: auto;
+	background-color: @background-color;
+	border: 1px solid @primary-background-color;
+	border-radius: 50%;
+	width: 24px;
+	height: 24px;
+	margin-left: -12px;
+	margin-top: 15px;
+	text-align: center;
+	vertical-align: middle;
+	overflow: hidden;
+	z-index: 10;
+	.sui-unselectable();
+}
+.sui-timeline-event-icon-collapsible {
+	cursor: pointer;
+}
+.sui-timeline-event-icon-inner {
+	display: inline-block;
+	margin-top: 4px;
+	width: 16px;
+	height: 16px;
+	vertical-align: top;
+}
+.sui-timeline-event-icon-inner img {
+	border: none;
+	vertical-align: top;
+}
+.sui-timeline-event-title {
+	font-weight: bold;
+    padding-left: 1.2em;
+	padding-right: 1.2em;
+    border-bottom: 1px solid @primary-background-color;
+}
+.sui-timeline-event-left .sui-timeline-event-title {
+	text-align: right;
+}
+.sui-timeline-event-collapsible .sui-timeline-event-title {
+	cursor: pointer;
+}
+.sui-timeline-event-text {
+    padding-left: 1.2em;
+	padding-right: 1.2em;
+}
+.sui-timeline-event-left .sui-timeline-event-text {
+	text-align: right;
+}

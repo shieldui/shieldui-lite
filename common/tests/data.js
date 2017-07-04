@@ -200,6 +200,45 @@ test("DataSource overrides remote request data", function () {
     $.ajax.restore();
 });
 
+test("DataSource sort with function for path", function() {
+    var numbers = {
+        "one": 1,
+        "two": 2,
+        "three": 3,
+        "four": 4,
+        "five": 5,
+        "six": 6,
+        "seven": 7,
+        "eight": 8,
+        "nine": 9,
+        "ten": 10
+    };
+
+    var ds = new shield.DataSource({
+        data: [10, "three", "six", 2, 4, "ten", "N/A", 1, "five", 7, "nine"],
+        sort: [
+            {
+                desc: false,
+                path: function(value) {
+                    if (value === "N/A") {
+                        return -1000;
+                    }
+                    else if (typeof value === "string") {
+                        return numbers[value];
+                    }
+                    else {
+                        return value;
+                    }
+                }
+            }
+        ]
+    });
+
+    ds.read();
+
+    deepEqual(ds.view, ["N/A", 1, 2, "three", 4, "five", "six", 7, "nine", 10, "ten"]);    
+});
+
 test("DataSource can cache remote response in in-memory cache", function () {
     expect(5);
 
@@ -436,7 +475,7 @@ test("DataSource schema converts to type when type defined", function () {
                 id: { type: String },
                 value: { path: "arr[1]", type: Number },
                 someValue: { path: "arr[2].id", type: Number },
-                dateValue: { path: "dateStr", type: Date }
+                dateValue: { path: "dateStr", type: Date, nullable: true }
             }
         }
     });
@@ -450,7 +489,7 @@ test("DataSource schema converts to type when type defined", function () {
 
         // model behavior always defaults to null for nullable fields with a defined type
         if (someValue === undefined) {
-            someValue = null;
+            someValue = 0;
         }
 
         var dateValue = new Date(item.dateStr);
@@ -942,7 +981,7 @@ test("DataQuery aggregate", function() {
     equal(query.aggregates[0].value, 1, "min");
     equal(query.aggregates[1].value, new Date("10/17/2013 09:15:00") + "", "max");
     equal(query.aggregates[2].value, 55, "sum");
-//    equal(query.aggregates[3].value, new Date("01/01/2005 12:59:42") + "", "average");
+    //equal(query.aggregates[3].value, new Date("01/01/2005 12:59:42") + "", "average");
     equal(query.aggregates[4].value, 10, "count");
     equal(query.aggregates[5].value, "xxx", "custom");
 });
@@ -1041,7 +1080,7 @@ test("DataQuery group", function() {
     equal(query.aggregates[0].value, 1, "min");
     equal(query.aggregates[1].value, new Date("10/17/2013 09:15:00") + "", "max");
     equal(query.aggregates[2].value, 55, "sum");
-//    equal(query.aggregates[3].value, new Date("01/01/2005 12:59:42") + "", "average");
+    //equal(query.aggregates[3].value, new Date("01/01/2005 12:59:42") + "", "average");
     equal(query.aggregates[4].value, 10, "count");
     equal(query.aggregates[5].value, "xxx", "custom");
 
@@ -1212,8 +1251,8 @@ test("XmlSchema can parse XML string into JSON", function () {
         title: { path: "_title" },
         name: { path: "name._text" },
         startyear: { path: "started.year._text", type: Number },
-        full: { path: "started.year._full", type: Boolean},
-        online: { path: "online._text", type: Date }
+        full: { path: "started.year._full", type: Boolean },
+        online: { path: "online._text", type: Date, nullable: true }
     }
 
     ds.read().then(function (result) {
@@ -1226,8 +1265,8 @@ test("XmlSchema can parse XML string into JSON", function () {
         }, {
             title: "Salesperson",
             name: "Jim Smith",
-            startyear: null,
-            full: null,
+            startyear: 0,
+            full: false,
             online: new Date(2013, 9, 30, 0, 22)
         }], "JSON with projection correct")
     });    

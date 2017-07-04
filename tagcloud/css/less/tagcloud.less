@@ -1,0 +1,48 @@
+/* Import the theme */
+@import "../../../common/less/themes/@{theme}.less";
+
+/* TagCloud styles */
+.sui-tagcloud {
+	position: relative;
+	display: block;
+	color: @text-color;
+    background-color: @background-color;
+	border: 1px solid @border-color;
+	margin: 0px;
+	padding: 0px;
+	outline: 0;
+	font-size: @font-size;
+	font-family: @font-family;
+	line-height: normal;
+	overflow: hidden;
+}
+.sui-tagcloud-title {
+	display: block;
+	width: 100%;
+	padding: 0.7em;
+	color: @primary-text-color;
+	background-color: @primary-background-color;
+	.sui-gradient-vertical(@primary-background-color);
+	overflow: hidden;
+}
+.sui-tagcloud-content {
+	display: block;
+	padding: 0.4em;
+	overflow-x: hidden;
+    overflow-y: auto;	
+}
+.sui-tagcloud-item {
+	position: relative;
+	display: inline-block;
+	margin: 0.2em;
+}
+a.sui-tagcloud-link, 
+a.sui-tagcloud-link:link, 
+a.sui-tagcloud-link:visited, 
+a.sui-tagcloud-link:hover, 
+a.sui-tagcloud-link:active {
+	text-decoration: inherit;
+	color: inherit;
+	font-weight: inherit;
+	font-style: inherit;
+}

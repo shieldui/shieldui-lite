@@ -1,0 +1,81 @@
+/* Import the theme */
+@import "../../../common/less/themes/@{theme}.less";
+
+/* Rating styles */
+.sui-rating
+{
+    display: -moz-inline-box;
+    display: inline-block;
+    position: relative;
+    .sui-unselectable();
+}
+
+.sui-rating-disabled
+{
+    opacity: 0.4;
+	filter: alpha(opacity=40);
+}
+
+.sui-rating .sui-rating-range
+{
+    position: relative;
+    display: inline-block;
+    background: url(../img/stars.png);
+    height: 16px;
+    outline: none;
+}
+
+.sui-rating .sui-rating-range *
+{
+    display: block;
+}
+
+/* for IE 6 */
+* html .sui-rating, * html .sui-rating .sui-rating-range
+{
+    display: inline;
+}
+
+/* for IE 7 */
+* + html .sui-rating, * + html .sui-rating .sui-rating-range
+{
+    display: inline;
+}
+
+.sui-rating .sui-rating-hover, .sui-rating .sui-rating-selected
+{
+    position: absolute;
+    left: 0px;
+}
+
+.sui-rating .sui-rating-hover-rtl, .sui-rating .sui-rating-selected-rtl
+{
+    left: auto;
+    right: 0px;
+}
+
+.sui-rating .sui-rating-hover,
+.sui-rating .sui-rating-selected,
+.sui-rating .sui-rating-preset,
+.sui-rating .sui-rating-preset-rtl
+{
+    background-image: url(../img/stars.png);
+}
+.sui-rating .sui-rating-selected
+{
+    background-position: left unit(-@rating-stars-sprite-pos * 16, px);
+}
+.sui-rtl .sui-rating .sui-rating-selected
+{
+    background-position: right unit(-@rating-stars-sprite-pos * 16, px);
+}
+.sui-rating .sui-rating-hover,
+.sui-rating .sui-rating-preset,
+.sui-rating .sui-rating-preset-rtl
+{
+    background-position: left unit(-@rating-stars-sprite-pos * 16 - 16, px);
+}
+.sui-rtl .sui-rating .sui-rating-hover
+{
+    background-position: right unit(-@rating-stars-sprite-pos * 16 - 16, px);
+}

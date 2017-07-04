@@ -2,11 +2,7 @@
 module.exports = function(grunt) {
 
 grunt.initConfig({
-	pkg: (function() {
-        var config = grunt.file.readJSON('package.json');
-        config.version = grunt.file.read('VERSION').replace(/\s+/g, '');
-        return config;
-    })(),
+	pkg: grunt.file.readJSON('package.json'),
 
     bower: {
         install: {
@@ -134,7 +130,7 @@ grunt.initConfig({
         main: {
 			options: {
 				position: 'top',
-				banner: "/* Shield UI Lite <%= pkg.version %> | Copyright 2013-" + (new Date()).getFullYear() + " Shield UI Ltd. | <%= pkg.homepage %> */"
+				banner: "/* Shield UI Lite <%= pkg.version %> | Copyright 2013-" + (new Date()).getFullYear() + " Shield UI Ltd. | <%= pkg.homepage %> */\n\n/*" + grunt.file.read('LICENSE.txt') + '*/\n'
 			},
 			files: {
 				src: [
@@ -166,7 +162,16 @@ grunt.initConfig({
                 'dist/js/<%= pkg.name %>-pager.min.js',
                 'dist/js/<%= pkg.name %>-input.min.js',
                 'dist/js/<%= pkg.name %>-calendar.min.js',
-                'dist/js/<%= pkg.name %>-grid.min.js'
+                'dist/js/<%= pkg.name %>-grid.min.js',
+                'dist/js/<%= pkg.name %>-colorpicker.min.js',
+                'dist/js/<%= pkg.name %>-layout.min.js',
+                'dist/js/<%= pkg.name %>-menu.min.js',
+                'dist/js/<%= pkg.name %>-progressbar.min.js',
+                'dist/js/<%= pkg.name %>-rating.min.js',
+                'dist/js/<%= pkg.name %>-slider.min.js',
+                'dist/js/<%= pkg.name %>-tagcloud.min.js',
+                'dist/js/<%= pkg.name %>-timeline.min.js',
+                'dist/js/<%= pkg.name %>-window.min.js'
             ]
         },
         themes: {

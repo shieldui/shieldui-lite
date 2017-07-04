@@ -3,18 +3,23 @@
 
 /* Pager styles */
 .sui-pager-core {
-    padding-bottom: 0.250em;
-    padding-top: 0.563em;
+    padding-bottom: 0.560em;
+    padding-top: 0.560em;
     white-space: normal;
-    width: 100%;
-	font-size: 14px;
+	font-size: @font-size;
 	font-family: @font-family;
+	display: inline-block;
+    width: 100%;
+	vertical-align: middle;
 }
 .sui-pager-element, .sui-pagination-ie {
     float: left;
 }
 .sui-pager-core div, .sui-pager-core a {
     .sui-unselectable();
+}
+.sui-pagination {
+	vertical-align: middle;
 }
 .sui-pagination a {
     cursor: pointer;
@@ -34,7 +39,7 @@
 }
 .sui-pager-core .sui-pagination {
     display: inline-block;
-    margin: 0 0 0 0.375em;
+    margin: 0 0.375em 0 0.375em;
     overflow: hidden;
     cursor: default;
     list-style-type: none;
@@ -55,12 +60,13 @@
     display: inline-block;
     float: right;
     padding-right: 0.375em;
-    padding-top: 0.250em;
+    padding-top: 0.375em;
 }
 .sui-pager-core .sui-disabled {
     opacity: 0.4;
     filter: alpha(opacity=40);
     cursor: default;
+	pointer-events: none;
 }
 
 .sui-pager {

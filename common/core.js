@@ -1,5 +1,5 @@
 (function ($, win, undefined) {
-    "use strict";
+    //"use strict";
 
     var shield = win.shield = win.shield || {},
 		extend = $.extend,
@@ -19,6 +19,7 @@
         BOOLEAN = "boolean",
         NULL = "null",
         UNDEFINED = "undefined",
+        SUI_VC_TOP = "sui-vc-top",
         NOOP = function () {},
 
         idCounter = 100,
@@ -34,6 +35,7 @@
 		// some globally-used constants
 		Constants = {
 			SVG_NS: "http://www.w3.org/2000/svg",
+            XHTML_NS: "http://www.w3.org/1999/xhtml",
 
 			KeyCode: {
 				BACK: 8,
@@ -317,8 +319,13 @@
         if (die) {
             throw new Error(msg);
         }
-        else if (win.console && win.console.error) {
-            console.error(msg);
+        else if (win.console) {
+            if (win.console.error) {
+                console.error(msg);
+            }
+            else {
+                console.log(msg);
+            }
         }
     }
 
@@ -528,21 +535,6 @@
     }
 
     /**
-	* Retrieve the widget instance associated with the target element. 
-	* If multiple elements are provided, retrieve an array of all widgets associated with them.
-	*/
-    $.fn.swidget = function (name) {
-        var widgets = this.map(function (index) {
-            // if name specified, return the widget by name, 
-            // otherwise return the last created instance for the element
-            return name ? $(this).data(SHIELD_WIDGET + "-" + name) : $(this).data(SHIELD_WIDGET);
-        }).get();
-
-        // if called for more than one element, return array, otherwise just return one object
-        return widgets.length ? (widgets.length > 1 ? widgets : widgets[0]) : null;
-    };
-
-    /**
 	* Base event dispatcher implementing common functionality for un/registering and triggering events.
 	* @param {Object} options The initialization options for the dispatcher
 	*/
@@ -573,8 +565,8 @@
                 events = that.events,
                 eventNames = to.array(eventName),
                 handlerFunc = is.func(handler),
+                eventType,
                 current,
-                original,
                 i, 
                 len, 
                 key;
@@ -594,14 +586,17 @@
 
             for (i = 0, len = eventNames.length; i < len; i++) {
                 eventName = eventNames[i];
+                eventType = that._eventType(eventName);
                 current = handlerFunc ? handler : handler[eventName];
 
                 if (is.func(current)) {
                     if (one) {
-                        original = current;
                         current = that._one(eventName, current);
                     }
-                    (events[eventName] || (events[eventName] = [])).push(current);
+                    (events[eventType] || (events[eventType] = [])).push({
+                        name: eventName,
+                        handler: current
+                    });
                 }
             }
 
@@ -618,6 +613,59 @@
                 };
 
             return oneHandler;
+        },
+
+        // gets the event type from its name (strips any namespaces)
+        _eventType: function(eventName) {
+            var pos = (eventName += "").indexOf(".");
+            return pos > -1 ? eventName.substring(0, pos) : eventName;
+        },
+
+        // checks whether eventName matches the event name and all namespaces of eventNameB
+        // NOTE: assumes eventName will be a fully-qualified event of the form: type.ns1.ns2.etc...
+        _eventNameMatch: function(eventNameA, eventNameB) {
+            var that = this,
+                eventTypeA = that._eventType(eventNameA),
+                eventTypeB = that._eventType(eventNameB),
+                eventANS,
+                eventBNS,
+                foundNS,
+                i;
+
+            eventNameA += "";
+            eventNameB += "";
+
+            // the second event does not have a type - its a namespace only - starts with dot, 
+            // or if the event types match, check whether all namespaces found in event B are present in A
+            if (eventTypeA === eventTypeB || !eventTypeB) {
+                eventANS = eventNameA.split('.');
+                eventANS.shift();
+                eventANS = grep(eventANS, function(item) {
+                    return is.string(item) && item.length > 0;
+                });
+
+                eventBNS = eventNameB.split('.');
+                if (eventTypeB) {
+                    eventBNS.shift();
+                }
+                eventBNS = grep(eventBNS, function(item) {
+                    return is.string(item) && item.length > 0;
+                });
+
+                if (eventANS && eventBNS) {
+                    foundNS = 0;
+
+                    for (i=0; i<eventBNS.length; i++) {
+                        if ($.inArray(eventBNS[i], eventANS) > -1) {
+                            foundNS++;
+                        }
+                    }
+
+                    return foundNS >= eventBNS.length;
+                }
+            }
+
+            return false;
         },
 
         /**
@@ -639,10 +687,13 @@
                 events = that.events,
                 eventNames = to.array(eventName),
                 handlerFunc = is.func(handler),
+                eventType,
                 handlers,
                 current,
                 found,
-                i, j, key;
+                i,
+                j,
+                key;
 
             if (is.object(eventName)) {
                 eventNames = [];
@@ -657,24 +708,42 @@
                 handler = eventName;
             }
 
-            for (i = 0; i < eventNames.length; i++) {
-                eventName = eventNames[i];
-                handlers = events[eventName] || [];
-                current = handlerFunc ? handler : (handler || {})[eventName];
+            // if eventName is a string and contains only namespaces (starts with a dot),
+            // iterate through all events
+            if (is.string(eventName) && eventName.indexOf(".") === 0) {
+                for (eventType in events) {
+                    if (events.hasOwnProperty(eventType)) {
+                        handlers = events[eventType] || [];
+                        current = handlerFunc ? handler : handler || undefined;
 
-                if (current) {
-                    for (j = handlers.length - 1; j >= 0; j--) {
-                        if (handlers[j] === current) {
-                            handlers.splice(j, 1);
+                        for (j = handlers.length - 1; j >= 0; j--) {
+                            if (that._eventNameMatch(handlers[j].name, eventName) && (!is.defined(current) || handlers[j].handler === current)) {
+                                handlers.splice(j, 1);
+                            }
+                        }
+
+                        if (!handlers.length) {
+                            delete events[eventType];
                         }
                     }
                 }
-                else {
-                    handlers.length = 0;
-                }
+            }
+            else {
+                for (i = 0; i < eventNames.length; i++) {
+                    eventName = eventNames[i];
+                    eventType = that._eventType(eventName);
+                    handlers = events[eventType] || [];
+                    current = handlerFunc ? handler : (handler || {})[eventName];
 
-                if (!handlers.length) {
-                    delete events[eventName];
+                    for (j = handlers.length - 1; j >= 0; j--) {
+                        if (that._eventNameMatch(handlers[j].name, eventName) && (!is.defined(current) || handlers[j].handler === current)) {
+                            handlers.splice(j, 1);
+                        }
+                    }
+
+                    if (!handlers.length) {
+                        delete events[eventType];
+                    }
                 }
             }
 
@@ -689,13 +758,13 @@
         */
         trigger: function (eventName, args) {
             var that = this,
-                handlers = (that.events[eventName] || []).slice(),
-                handler,
+                eventType = that._eventType(eventName),
+                handlers = (that.events[eventType] || []).slice(),
 	            i,
                 len;
 
             for (i = 0, len = handlers.length; i < len; i++) {
-                handlers[i].apply(that, [].slice.call(arguments, 1));
+                handlers[i].handler.apply(that, [].slice.call(arguments, 1));
             }
 
             return args;
@@ -862,6 +931,7 @@
         }
     });
 
+
     // VirtualizedContainer class - a class for a virtualized container
     var VirtualizedContainer = Dispatcher.extend({
         options: {
@@ -903,7 +973,7 @@
                     position: "relative"
                 })
                 .on("scroll" + options.eventNS, proxy(that.scroll, that))
-                .append("<div class='sui-virtualized' />")
+                .append('<div class="sui-virtualized"/>')
                 .find(".sui-virtualized")
                 .css({
                     position: "relative",
@@ -916,6 +986,8 @@
                 position: "absolute",
                 top: 0
             });
+
+            that._positionedContainer = wrapper.children().first();
         },
 
         // get various dimensions
@@ -959,6 +1031,31 @@
             that._renderItems(0, Math.min(options.total, (options.pageBuffer + 1) * dims.itemsPerPage));
         },
 
+        // renders the items with index start to end
+        // calls the "done" (if any) handler when all items have been appended to the container
+        _renderItems: function (start, end, done) {
+            var that = this;
+
+            that.options.getItems(start, end, function (itemsArray, emptyContainer) {
+                var i,
+                    len = itemsArray.length;
+
+                // empty the container unless specifically forbidden
+                emptyContainer = is.defined(emptyContainer) ? !!emptyContainer : true;
+                if (emptyContainer) {
+                    that.container.empty();
+                }
+
+                for (i = 0; i < len; i++) {
+                    that.container.append(itemsArray[i]);
+                }
+
+                if (done) {
+                    done();
+                }
+            });
+        },
+
         // called on wrapper scroll event
         scroll: function () {
             var that = this,
@@ -969,8 +1066,12 @@
                 prevScroll = that.prevScroll,
                 diff = scroll - prevScroll,
                 pos = scroll / dims.totalScrollableHeight,
-                positionedContainer = that.wrapper.children(),
-                currentTop = parseFloat(positionedContainer.css("top")) || 0,
+                //positionedContainer = that.wrapper.children().first(),
+                positionedContainer = that._positionedContainer,
+                // WARNING: instead of taking the current top from the element,
+                // take it from the data field where we will have saved it;
+                //currentTop = parseFloat(positionedContainer.css("top")) || 0,
+                currentTop = positionedContainer.data(SUI_VC_TOP) || 0,
                 top = scroll - pos * (dims.pageHeight - dims.viewportHeight),
                 overflowBottom = diff > 0 && (top - currentTop) > ((pageBuffer / 4 + 1) * dims.pageHeight),
                 overflowTop = diff < 0 && (top - currentTop) <= pageBuffer / 4 * dims.pageHeight,
@@ -979,7 +1080,7 @@
                 end;
 
             if (overflowTop || overflowBottom) {
-                visibleStart = Math.floor((pos * dims.total) - (pos * dims.itemsPerPage));
+                visibleStart = Math.min(dims.total, Math.floor((pos * dims.total) - (pos * dims.itemsPerPage)));
                 start = Math.max(0, visibleStart - (pageBuffer / 2 * dims.itemsPerPage));
                 end = Math.min(dims.total, start + ((pageBuffer + 1) * dims.itemsPerPage));
                 top = Math.max(0, top - ((visibleStart - start) * dims.itemHeight));
@@ -988,35 +1089,26 @@
                 // and adjusts the scroll position
                 that._renderItems(start, end, function () {
                     positionedContainer.css("top", top);
+
+                    // WARNING: save the top in a data field because the browser 
+                    // might not support that much of a height for elements
+                    positionedContainer.data(SUI_VC_TOP, top);
                 });
             }
 
             that.prevScroll = scroll;
         },
 
-        // renders the items with index start to end
-        // calls the "done" (if any) handler when all items have been appended to the container
-        _renderItems: function (start, end, done) {
+        scrollTop: function(value) {
             var that = this,
-                options = that.options,
-                i, 
-                len;
+                element = that.element;
 
-            options.getItems(start, end, function (itemsArray, emptyContainer) {
-                // empty the container unless specifically forbidden
-                emptyContainer = is.defined(emptyContainer) ? !!emptyContainer : true;
-                if (emptyContainer) {
-                    that.container.empty();
-                }                
-
-                for (i = 0, len = itemsArray.length; i < len; i++) {
-                    that.container.append(itemsArray[i]);
-                }
-
-                if (done) {
-                    done();
-                }
-            });
+            if (is.defined(value)) {
+                element.scrollTop(value);
+            }
+            else {
+                return element.scrollTop();
+            }
         },
 
         // class destructor
@@ -1033,6 +1125,43 @@
             Dispatcher.fn.destroy.call(that);
         }
     });
+
+
+    function getSwidgets(elements, name) {
+        var widgets = [],
+            length = $(elements).length,
+            dataSelector = name ? (SHIELD_WIDGET + "-" + name) : SHIELD_WIDGET,
+            widget,
+            i;
+
+        for (i=0; i<length; i++) {
+            widget = $($(elements)[i]).data(dataSelector);
+            if (widget) {
+                widgets.push(widget);
+            }
+        }
+
+        return widgets;
+    }
+
+    /**
+	* Retrieve the widget instance associated with the set of matched elements. 
+	* If multiple elements are provided, retrieve an array of all widgets associated with them.
+	*/
+    $.fn.swidget = function (name) {
+        var widgets = getSwidgets(this, name);
+
+        // if called for more than one element, return array, otherwise just return one object
+        return widgets.length ? (widgets.length > 1 ? widgets : widgets[0]) : null;
+    };
+
+    /**
+	* Retrieve all widget instances associated with the set of matched elements. 
+    * Returns a list
+	*/
+    $.fn.swidgets = function(name) {
+        return getSwidgets(this, name);
+    };
 
     /*
 	* Create a jQuery plugin from a widget class.
@@ -1054,7 +1183,7 @@
                 args = [].slice.call(arguments, 1);
 
                 this.each(function () {
-                    var instance = $.data(this, SHIELD_WIDGET),
+                    var instance = $(this).data(SHIELD_WIDGET),
                         method,
                         result;
 
@@ -1084,8 +1213,7 @@
                 // in the rest of the cases, construct the plugin as normal
                 return this.each(function () {
                     // construct an instance of the widget
-                    var instance = new WidgetClass(this, options),
-                        widgets;
+                    var instance = new WidgetClass(this, options);
 
                     // store a reference to the instance in the element's .data,
                     // overwriting all previous ones
@@ -1281,6 +1409,16 @@
 
             return false;
         })();
+
+        support.hasScrollbarY = function(element) {
+            var el = $(element).get(0);
+            return el.scrollHeight > el.clientHeight;
+        };
+
+        support.hasScrollbarX = function(element) {
+            var el = $(element).get(0);
+            return el.scrollWidth > el.clientWidth;
+        };
     })();
 
     (function () {
@@ -1329,10 +1467,12 @@
     $(function () {
         //detect maximum supported element height
         var inc = 1000000,
-            maxTested = support.browser.firefox ? 6000000 : 1000000000,
-            elem = $("<div style='display:none' />").appendTo(doc.body),
-            current, height = inc;
-        
+            //maxTested = support.browser.firefox ? 6000000 : 1000000000,
+            maxTested = 1000000000,
+            elem = $('<div style="display:none;"/>').appendTo(doc.body),
+            current, 
+            height = inc;
+
         while (true) {
             current = height + inc;
             elem.css("height", current);
@@ -1383,6 +1523,7 @@
         getCurrencyInfo: getCurrencyInfo,
         error: error,
         dieOnError: true,
+        iid: iid,
         strid: strid,
         guid: guid,
         support: support,

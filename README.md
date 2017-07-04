@@ -11,11 +11,14 @@ The widgets included in the present Suite are listed below.
 
 ### Included Widgets
 
+* [Accordion](https://demos.shieldui.com/web/accordion/basic-usage)
 * [AutoComplete](https://demos.shieldui.com/web/autocomplete/basic-usage)
 * [Button](https://demos.shieldui.com/web/button/basic-usage)
 * [Calendar](https://demos.shieldui.com/web/calendar/basic-usage)
 * [CheckBox](https://demos.shieldui.com/web/checkbox/basic-usage)
+* [ColorPicker](https://demos.shieldui.com/web/colorpicker/basic-usage)
 * [ComboBox](https://demos.shieldui.com/web/combobox/basic-usage)
+* [ContextMenu](https://demos.shieldui.com/web/contextmenu/basic-usage)
 * [DataSource](http://www.shieldui.com/documentation/datasource)
 * [DatePicker](https://demos.shieldui.com/web/datepicker/basic-usage)
 * [DateTimePicker](https://demos.shieldui.com/web/datetimepicker/api)
@@ -24,14 +27,24 @@ The widgets included in the present Suite are listed below.
 * [ListBox](https://demos.shieldui.com/web/listbox/basic-usage)
 * [LoadingPanel](https://demos.shieldui.com/web/loadingpanel/template)
 * [MaskedTextBox](https://demos.shieldui.com/web/maskedtextbox/basic-usage)
+* [Menu](https://demos.shieldui.com/web/menu/basic-usage)
 * [MonthYearPicker](https://demos.shieldui.com/web/monthyearpicker/basic-usage)
 * [NumericTextBox](https://demos.shieldui.com/web/numerictextbox/basic-usage)
 * [Pager](https://demos.shieldui.com/web/pager/basic-usage)
+* [ProgressBar](https://demos.shieldui.com/web/progressbar/basic-usage)
 * [QRCode](https://demos.shieldui.com/web/qrcode/basic-usage)
 * [RadioButton](https://demos.shieldui.com/web/radiobutton/basic-usage)
+* [Rating](https://demos.shieldui.com/web/rating/evaluation)
+* [Slider](https://demos.shieldui.com/web/slider/basic-usage)
+* [Splitter](https://demos.shieldui.com/web/splitter/basic-usage)
 * [Switch](https://demos.shieldui.com/web/switch/preferences)
+* [Tabs](https://demos.shieldui.com/web/tabs/basic-usage)
+* [TagCloud](https://demos.shieldui.com/web/tagcloud/basic-usage)
 * [TextBox](https://demos.shieldui.com/web/textbox/basic-usage)
+* [Timeline](https://demos.shieldui.com/web/timeline/basic-usage)
 * [TimePicker](https://demos.shieldui.com/web/timepicker/basic-usage)
+* [Tooltip](https://demos.shieldui.com/web/tooltip/basic-usage)
+* [Window](https://demos.shieldui.com/web/window/basic-functionality)
 
 ### Bower Installation
 
@@ -125,42 +138,46 @@ The table below summarizes the components included in the two versions of the Sh
 
 | Component       | ShieldUI Lite | ShieldUI Standard |
 |-----------------|:---------------:|:-------------:|
+| [Accordion](https://demos.shieldui.com/web/accordion/basic-usage)       |       Yes      |      Yes     |
 | [AutoComplete](https://demos.shieldui.com/web/autocomplete/basic-usage)    |      Yes      |      Yes     |
+| [Barcode Suite](https://demos.shieldui.com/web/barcode/basic-usage)   |       No      |      Yes     |
 | [Button](https://demos.shieldui.com/web/button/basic-usage)          |      Yes      |      Yes     |
 | [Calendar](https://demos.shieldui.com/web/calendar/basic-usage)        |      Yes      |      Yes     |
+| [Chart](https://demos.shieldui.com/web/area-chart/axis-marker)           |       No      |      Yes     |
 | [CheckBox](https://demos.shieldui.com/web/checkbox/basic-usage)        |      Yes      |      Yes     |
+| [ColorPicker](https://demos.shieldui.com/web/colorpicker/basic-usage)     |       Yes      |      Yes     |
 | [ComboBox](https://demos.shieldui.com/web/combobox/basic-usage)        |      Yes      |      Yes     |
+| [ContextMenu](https://demos.shieldui.com/web/contextmenu/basic-usage)        |      Yes      |      Yes     |
 | [DataSource](http://www.shieldui.com/documentation/datasource)      |      Yes      |      Yes     |
 | [DatePicker](https://demos.shieldui.com/web/datepicker/basic-usage)      |      Yes      |      Yes     |
 | [DateTimePicker](https://demos.shieldui.com/web/datetimepicker/api)  |      Yes      |      Yes     |
 | [DropDown](https://demos.shieldui.com/web/dropdown/basic-usage)        |      Yes      |      Yes     |
+| [Editor](https://demos.shieldui.com/web/editor/basic-usage)      |      No      |      Yes     |
 | [Grid](https://demos.shieldui.com/web/grid-general/basic-usage)            |      Yes      |      Yes     |
 | [ListBox](https://demos.shieldui.com/web/listbox/basic-usage)         |      Yes      |      Yes     |
 | [LoadingPanel](https://demos.shieldui.com/web/loadingpanel/template)    |      Yes      |      Yes     |
 | [MaskedTextBox](https://demos.shieldui.com/web/maskedtextbox/basic-usage)   |      Yes      |      Yes     |
+| [Menu](https://demos.shieldui.com/web/menu/basic-usage)        |      Yes      |      Yes     |
 | [MonthYearPicker](https://demos.shieldui.com/web/monthyearpicker/basic-usage) |      Yes      |      Yes     |
 | [NumericTextBox](https://demos.shieldui.com/web/numerictextbox/basic-usage)  |      Yes      |      Yes     |
 | [Pager](https://demos.shieldui.com/web/pager/basic-usage)           |      Yes      |      Yes     |
+| [ProgressBar](https://demos.shieldui.com/web/progressbar/basic-usage)    |       Yes      |      Yes     |
 | [QRCode](https://demos.shieldui.com/web/qrcode/basic-usage)          |      Yes      |      Yes     |
 | [RadioButton](https://demos.shieldui.com/web/radiobutton/basic-usage)     |      Yes      |      Yes     |
+| [Rating](https://demos.shieldui.com/web/rating/evaluation)          |       Yes      |      Yes     |
+| [Slider](https://demos.shieldui.com/web/slider/basic-usage)          |       Yes      |      Yes     |
+| [Splitter](https://demos.shieldui.com/web/splitter/basic-usage)        |       Yes      |      Yes     |
 | [Switch](https://demos.shieldui.com/web/switch/preferences)          |      Yes      |      Yes     |
+| [Tabs](https://demos.shieldui.com/web/tabs/basic-usage)         |      Yes      |      Yes     |
+| [TagCloud](https://demos.shieldui.com/web/tagcloud/basic-usage)         |      Yes      |      Yes     |
 | [TextBox](https://demos.shieldui.com/web/textbox/basic-usage)         |      Yes      |      Yes     |
+| [Timeline](https://demos.shieldui.com/web/timeline/basic-usage)         |       Yes      |      Yes     |
 | [TimePicker](https://demos.shieldui.com/web/timepicker/basic-usage)      |      Yes      |      Yes     |
-| [Chart](https://demos.shieldui.com/web/area-chart/axis-marker)           |       No      |      Yes     |
-| [Editor](https://demos.shieldui.com/web/editor/basic-usage)           |       No      |      Yes     |
-| [Barcode Suite](https://demos.shieldui.com/web/barcode/basic-usage)   |       No      |      Yes     |
-| [Accordion](https://demos.shieldui.com/web/accordion/basic-usage)       |       No      |      Yes     |
-| [ColorPicker](https://demos.shieldui.com/web/colorpicker/basic-usage)     |       No      |      Yes     |
-| [ProgressBar](https://demos.shieldui.com/web/progressbar/basic-usage)    |       No      |      Yes     |
-| [Rating](https://demos.shieldui.com/web/rating/evaluation)          |       No      |      Yes     |
-| [Slider](https://demos.shieldui.com/web/slider/basic-usage)          |       No      |      Yes     |
-| [Splitter](https://demos.shieldui.com/web/splitter/basic-usage)        |       No      |      Yes     |
-| [Timeline](https://demos.shieldui.com/web/timeline/basic-usage)         |       No      |      Yes     |
-| [Tooltip](https://demos.shieldui.com/web/tooltip/basic-usage)         |       No      |      Yes     |
+| [Tooltip](https://demos.shieldui.com/web/tooltip/basic-usage)         |       Yes      |      Yes     |
 | [TreeMap](https://demos.shieldui.com/web/treemap/basic-usage)         |       No      |      Yes     |
 | [TreeView](https://demos.shieldui.com/web/treeview/basic-usage)         |       No      |      Yes     |
 | [Upload](https://demos.shieldui.com/web/upload/basic-usage)         |       No      |      Yes     |
-| [Window](https://demos.shieldui.com/web/window/basic-functionality)          |       No      |      Yes     |
+| [Window](https://demos.shieldui.com/web/window/basic-functionality)          |       Yes      |      Yes     |
 
 ## License Information
 
