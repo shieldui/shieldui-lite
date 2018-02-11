@@ -84,7 +84,7 @@ To build Shield UI Lite from the source code, you will need [NodeJS](https://nod
 Download and install NodeJS from [their website](https://nodejs.org/).
 
 #### Install Git
-Download and install Git from [their website](http://gruntjs.com/). 
+Download and install Git from [their website](http://git-scm.com/). 
 
 NOTE: You will need to install Git with the "Run Git from the Windows Command Prompt" option in order to be used by Bower, as it is shown below:
 > [ ] Use Git bash only
